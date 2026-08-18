@@ -383,6 +383,9 @@ class BalanceOut(CamelModel):
     # What can still be booked: every entry counted, including deductions dated
     # in the future. This is the figure the Apply Leave form must check.
     available: Decimal
+    # Committed to dates still in the future — the difference between the two
+    # figures above, whether the request is pending or already approved.
+    booked_ahead: Decimal = Decimal(0)
     accrued: Decimal
     carried_over: Decimal
     used: Decimal

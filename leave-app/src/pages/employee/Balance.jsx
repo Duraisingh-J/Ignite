@@ -118,9 +118,11 @@ export default function Balance() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 12 }}>
             {[
               ["Balance today", current.balance, COLORS.navy],
+              // Sits between the two headline figures so the subtraction reads
+              // left to right: balance − booked ahead = available.
+              ["Booked ahead", current.bookedAhead, COLORS.gold],
               ["Available to book", current.available, COLORS.teal],
-              ["Awaiting approval", current.reserved, COLORS.gold],
-              ["Taken", current.used, COLORS.inkSoft],
+              ["Taken so far", current.used, COLORS.inkSoft],
             ].map(([label, val, color]) => (
               <Card key={label} style={{ textAlign: "center" }}>
                 <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 24, color }}>{val}</div>
@@ -129,10 +131,23 @@ export default function Balance() {
             ))}
           </div>
 
-          <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.inkSoft, marginBottom: 24, maxWidth: 640 }}>
-            {Number(current.balance) !== Number(current.available)
-              ? "These differ because leave booked for a future date is dated in the future — it is not yet gone from today's balance, but it cannot be booked twice."
-              : "Nothing is currently held for a pending request, so both figures agree."}
+          <div style={{ fontFamily: FONTS.body, fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 24, maxWidth: 660, lineHeight: 1.6 }}>
+            {Number(current.bookedAhead) > 0 ? (
+              <>
+                <span style={{ fontFamily: FONTS.mono, color: COLORS.ink }}>
+                  {current.balance} − {current.bookedAhead} = {current.available}
+                </span>
+                {" — "}
+                {current.bookedAhead} day(s) are committed to dates that have not
+                arrived yet, so they still count towards today's balance but cannot
+                be booked again.
+                {Number(current.reserved) > 0 && (
+                  <> Of those, <strong>{current.reserved}</strong> are still awaiting approval.</>
+                )}
+              </>
+            ) : (
+              "Nothing is committed to a future date, so today's balance and what you can book agree."
+            )}
             {current.policyName && <> Policy: <strong>{current.policyName}</strong>.</>}
           </div>
 

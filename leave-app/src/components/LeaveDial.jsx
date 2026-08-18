@@ -65,7 +65,7 @@ export default function LeaveDial({
         )}
         {reserved > 0 && (
           <div style={{ fontFamily: FONTS.body, fontSize: 9.5, color: COLORS.gold, marginTop: 1 }}>
-            {reserved} held
+            {reserved} booked
           </div>
         )}
       </div>

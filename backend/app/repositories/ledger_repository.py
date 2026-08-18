@@ -66,6 +66,25 @@ async def available_total(employee_id: UUID, leave_type_id: UUID) -> Decimal:
     return Decimal(row["available"]) if row else Decimal(0)
 
 
+async def booked_ahead(employee_id: UUID, leave_type_id: UUID, as_of: date) -> Decimal:
+    """Days already committed to dates that have not arrived yet.
+
+    This is exactly the gap between balance_as_of(today) and available_total:
+    the leave is spoken for but has not been taken, so it is neither "awaiting
+    approval" once approved nor "taken" until the dates pass. Without it the
+    two headline figures differ by an amount nothing on screen explains.
+    """
+    row = await fetch_one(
+        """SELECT COALESCE(-sum(amount), 0) AS ahead
+             FROM leave_ledger
+            WHERE employee_id = %s AND leave_type_id = %s
+              AND entry_type IN ('DEDUCTION','REVERSAL')
+              AND effective_date > %s""",
+        (employee_id, leave_type_id, as_of),
+    )
+    return Decimal(row["ahead"]) if row else Decimal(0)
+
+
 async def reserved_amount(employee_id: UUID, leave_type_id: UUID) -> Decimal:
     """Days held by requests that are submitted but not yet finally decided."""
     row = await fetch_one(

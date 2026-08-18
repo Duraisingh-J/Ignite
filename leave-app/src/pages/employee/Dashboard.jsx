@@ -88,7 +88,7 @@ export default function EmployeeDashboard() {
                   label={b.leaveTypeName}
                   balance={b.displayBalance}
                   maxBalance={b.maxBalance}
-                  reserved={Number(b.reserved) || 0}
+                  reserved={Number(b.bookedAhead) || 0}
                   color={DIAL_COLORS[i % DIAL_COLORS.length]}
                 />
                 <div style={{ minWidth: 0 }}>
@@ -98,9 +98,10 @@ export default function EmployeeDashboard() {
                   <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.inkSoft, marginTop: 3 }}>
                     {b.available} to book
                   </div>
-                  {Number(b.reserved) > 0 && (
+                  {Number(b.bookedAhead) > 0 && (
                     <div style={{ fontFamily: FONTS.body, fontSize: 11.5, color: COLORS.gold, marginTop: 2 }}>
-                      {b.reserved} awaiting approval
+                      {b.bookedAhead} booked ahead
+                      {Number(b.reserved) > 0 && ` · ${b.reserved} awaiting approval`}
                     </div>
                   )}
                   <div style={{ fontFamily: FONTS.body, fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>

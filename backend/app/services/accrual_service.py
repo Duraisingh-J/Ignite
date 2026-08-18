@@ -227,6 +227,7 @@ async def balances_for(employee_id: UUID, as_of: date | None = None) -> list[dic
         d = await ledger_repository.balance_detail(employee["id"], lt["id"], as_of)
         reserved = await ledger_repository.reserved_amount(employee["id"], lt["id"])
         available = await ledger_repository.available_total(employee["id"], lt["id"])
+        booked_ahead = await ledger_repository.booked_ahead(employee["id"], lt["id"], as_of)
         policy = await accrual_policy_repository.select_for(
             region_id=employee["region_id"],
             leave_type_id=lt["id"],
@@ -247,6 +248,10 @@ async def balances_for(employee_id: UUID, as_of: date | None = None) -> list[dic
                 "balance": balance,
                 "displayBalance": round_to_step(balance, step),
                 "available": available,
+                # balance - bookedAhead = available. Named so the two headline
+                # figures visibly reconcile instead of differing by an unexplained
+                # amount once a request is approved.
+                "bookedAhead": booked_ahead,
                 "accrued": Decimal(d.get("accrued") or 0),
                 "carriedOver": Decimal(d.get("carried_over") or 0),
                 "used": -Decimal(d.get("used") or 0),

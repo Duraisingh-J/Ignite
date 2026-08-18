@@ -4,8 +4,15 @@
 const BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 
 export const EMPLOYEE_ID = import.meta.env.VITE_EMPLOYEE_ID;
+export const MANAGER_ID = import.meta.env.VITE_MANAGER_ID;
+export const TENANT_ID = import.meta.env.VITE_TENANT_ID;
 
-export async function request(path, options = {}) {
+/**
+ * @param {string} path
+ * @param {object} options  fetch options, plus `raw: true` to get the whole
+ *                          envelope (needed for paginated { data, meta }).
+ */
+export async function request(path, { raw = false, ...options } = {}) {
   let res;
   try {
     res = await fetch(`${BASE}${path}`, {
@@ -28,5 +35,5 @@ export async function request(path, options = {}) {
     throw err;
   }
 
-  return payload.data;
+  return raw ? payload : payload.data;
 }

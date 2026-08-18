@@ -41,15 +41,33 @@ Config lives in `.env`:
 
 ## What's live vs. still mocked
 
-| Page                        | Data source                                  |
-| --------------------------- | -------------------------------------------- |
-| employee/ApplyLeave         | **API** — POST `/leave-requests`             |
-| employee/MyRequests         | **API** — GET `/leave-requests?employeeId=`  |
-| employee/Holidays           | **API** — GET `/employees/{id}/holidays`     |
-| employee/Profile            | **API** — GET `/employees/{id}`              |
-| employee/Dashboard          | mock (needs balances — not in the v1 model)  |
-| employee/EligibleLeaveTypes | mock (needs balances — not in the v1 model)  |
-| manager/*, admin/*          | mock (no endpoints in this slice)            |
+**Nothing is mocked.** `src/data/mockData.js` has been deleted; every page reads
+from the v1 API.
+
+| Page | Endpoints |
+| --- | --- |
+| employee/Dashboard | `/leave-requests`, `/employees/{id}/holidays` |
+| employee/ApplyLeave | `POST /leave-requests`, `/leave-types` |
+| employee/MyRequests | `/leave-requests?employeeId=` |
+| employee/EligibleLeaveTypes | `/leave-types?regionId=` |
+| employee/Holidays | `/employees/{id}/holidays` |
+| employee/Profile | `/employees/{id}` |
+| manager/Dashboard | `/leave-requests/approvals`, `/employees/{id}/team` |
+| manager/Approvals | `/leave-requests/approvals`, `PATCH /leave-requests/{id}` |
+| manager/Team | `/employees/{managerId}/team` |
+| manager/Calendar | `/leave-requests/on-leave` |
+| admin/Dashboard | `/stats?tenantId=` |
+| admin/Employees | `/employees?tenantId=`, `POST /employees`, `/regions` |
+| admin/LeaveTypes | `/leave-types?tenantId=`, `POST /leave-types` |
+| admin/Holidays | `/holidays?tenantId=`, `POST /holidays` |
+| admin/Policies | `/leave-types?tenantId=`, `/regions` |
+
+### Removed rather than faked
+
+Balance dials, "balance after leave", and accrual rates are gone. The v1 model
+has no balance or accrual columns, so those numbers had nothing behind them.
+`admin/Policies` now shows the leave-type configuration that does exist and
+states plainly which policy fields are not yet modelled.
 
 ## The adapter boundary
 

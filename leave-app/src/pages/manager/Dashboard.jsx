@@ -1,7 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONTS } from "../../theme/colors";
-import { TEAM } from "../../data/mockData";
 import { useLeave } from "../../context/LeaveContext";
 import Card from "../../components/Card";
 import SectionLabel from "../../components/SectionLabel";
@@ -9,16 +8,21 @@ import ApprovalCard from "../../components/ApprovalCard";
 
 export default function ManagerDashboard() {
   const navigate = useNavigate();
-  const { approvals } = useLeave();
-  const onLeaveCount = TEAM.filter((t) => t.onLeave).length;
+  const { approvals, team, loading } = useLeave();
+
+  if (loading) {
+    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
+  }
+
+  const onLeaveCount = team.filter((t) => t.onLeave).length;
 
   return (
     <div>
-      <SectionLabel eyebrow="Priya · Manager">Manager dashboard</SectionLabel>
+      <SectionLabel eyebrow="Manager">Manager dashboard</SectionLabel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
         {[
           ["Pending approvals", approvals.length, COLORS.gold],
-          ["Team members", TEAM.length, COLORS.navy],
+          ["Team members", team.length, COLORS.navy],
           ["On leave today", onLeaveCount, COLORS.teal],
         ].map(([label, val, color]) => (
           <Card key={label} style={{ textAlign: "center" }}>
@@ -31,7 +35,7 @@ export default function ManagerDashboard() {
       <SectionLabel eyebrow="Needs you">Pending leave requests</SectionLabel>
       {approvals.length === 0 ? (
         <Card style={{ textAlign: "center", color: COLORS.inkSoft, fontFamily: FONTS.body }}>
-          Nothing pending — you're all caught up.
+          Nothing pending. You are all caught up.
         </Card>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

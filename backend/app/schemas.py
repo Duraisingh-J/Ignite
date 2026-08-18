@@ -66,11 +66,37 @@ class LeaveStatus(str, Enum):
 
 
 # ============================ Region ============================
+# date.weekday(): 0=Mon 1=Tue 2=Wed 3=Thu 4=Fri 5=Sat 6=Sun
+WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
 class RegionOut(CamelModel):
     id: UUID
     tenant_id: UUID
     code: str
     country_name: str
+    # Which weekdays are working days here. Mon-Fri in most of the world,
+    # Sun-Thu across much of the Gulf.
+    work_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
+    timezone: str = "UTC"
+
+
+class RegionCreate(CamelIn):
+    tenant_id: UUID
+    code: str = Field(min_length=2, max_length=8)
+    country_name: str = Field(min_length=1, max_length=80)
+    work_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
+    timezone: str = Field(default="UTC", max_length=64)
+
+    @model_validator(mode="after")
+    def _valid_work_days(self):
+        if not self.work_days:
+            raise ValueError("workDays must contain at least one weekday")
+        if any(d < 0 or d > 6 for d in self.work_days):
+            raise ValueError("workDays entries must be 0 (Mon) to 6 (Sun)")
+        if len(set(self.work_days)) == 7:
+            raise ValueError("workDays cannot be all seven days — there would be no weekend")
+        return self
 
 
 # ============================ Employee ============================
@@ -82,6 +108,9 @@ class EmployeeOut(CamelModel):
     region_id: UUID
     region_code: str
     region_country: str
+    # Mirrors the region's working week so the client preview can match the
+    # server's calculation without a second request.
+    region_work_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
     name: str
     email: str
     join_date: date

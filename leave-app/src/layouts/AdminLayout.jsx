@@ -1,6 +1,6 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
-import { Home, Users, Layers, Settings, CalendarDays } from "lucide-react";
+import { Home, Users, Layers, Settings, CalendarDays , Globe } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { COLORS } from "../theme/colors";
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: "employees", label: "Employees", icon: Users },
   { to: "types", label: "Leave Types", icon: Layers },
   { to: "policies", label: "Policies", icon: Settings },
+  { to: "regions", label: "Regions", icon: Globe },
   { to: "holidays", label: "Holidays", icon: CalendarDays },
 ];
 

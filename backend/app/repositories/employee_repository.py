@@ -7,6 +7,7 @@ _BASE_SELECT = """
     SELECT e.id, e.tenant_id, e.manager_id, e.region_id,
            e.name, e.email, e.join_date,
            r.code AS region_code, r.country_name AS region_country,
+           r.work_days AS region_work_days,
            m.name AS manager_name
       FROM employee e
       JOIN region r ON r.id = e.region_id

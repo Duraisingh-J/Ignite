@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
 
@@ -7,6 +8,7 @@ from app.repositories import (
     holiday_repository,
     leave_request_repository,
     leave_type_repository,
+    region_repository,
 )
 from app.services.holiday_expansion import expand
 from app.services.working_days import DayBreakdown, calc_working_days
@@ -21,15 +23,15 @@ _ALLOWED_TRANSITIONS = {
 }
 
 
-def _breakdown_for(row: dict, holiday_rows: list[dict]) -> DayBreakdown:
-    """Recompute a stored request's day count.
+def _breakdown_for(row: dict, ctx: "RegionContext") -> DayBreakdown:
+    """Recompute a stored request's day count using its region's rules.
 
     Recurring rules must be expanded against *this request's* range, not the
     current year — otherwise a 2029 request never sees a holiday anchored in
     2026, and the read disagrees with what submit() calculated.
     """
-    holidays = expand(holiday_rows, row["start_date"], row["end_date"])
-    return calc_working_days(row["start_date"], row["end_date"], holidays)
+    holidays = expand(ctx.holiday_rows, row["start_date"], row["end_date"])
+    return calc_working_days(row["start_date"], row["end_date"], holidays, ctx.work_days)
 
 
 def _to_dto(row: dict, breakdown: DayBreakdown) -> dict:
@@ -65,9 +67,24 @@ def _to_approval_dto(row: dict, breakdown: DayBreakdown) -> dict:
     }
 
 
-async def _holiday_rows_for_region(region_id: UUID) -> list[dict]:
-    """Raw rows (with recurrence), fetched once and expanded per request."""
-    return await holiday_repository.find_by_region(region_id)
+@dataclass(frozen=True)
+class RegionContext:
+    """Everything the day calculation needs about one region.
+
+    Fetched once per region and reused across that region's requests, so
+    listing N requests stays 2 queries rather than 2N.
+    """
+
+    holiday_rows: list[dict]
+    work_days: list[int]
+
+
+async def _region_context(region_id: UUID) -> RegionContext:
+    region = await region_repository.find_by_id(region_id)
+    return RegionContext(
+        holiday_rows=await holiday_repository.find_by_region(region_id),
+        work_days=(region or {}).get("work_days") or [0, 1, 2, 3, 4],
+    )
 
 
 # ============================ submit ============================
@@ -96,7 +113,9 @@ async def submit(
     holidays = await holiday_repository.find_dates_in_range(
         employee["region_id"], start_date, end_date
     )
-    breakdown = calc_working_days(start_date, end_date, holidays)
+    region = await region_repository.find_by_id(employee["region_id"])
+    work_days = (region or {}).get("work_days") or [0, 1, 2, 3, 4]
+    breakdown = calc_working_days(start_date, end_date, holidays, work_days)
     if breakdown.chargeable_days <= 0:
         raise ApiError.bad_request(
             "This range has no working days to charge — it's all weekends/holidays"
@@ -130,8 +149,8 @@ async def get_by_employee(employee_id: UUID) -> list[dict]:
     rows = await leave_request_repository.find_by_employee(employee_id)
     if not rows:
         return []
-    holiday_rows = await _holiday_rows_for_region(employee["region_id"])
-    return [_to_dto(r, _breakdown_for(r, holiday_rows)) for r in rows]
+    ctx = await _region_context(employee["region_id"])
+    return [_to_dto(r, _breakdown_for(r, ctx)) for r in rows]
 
 
 async def get_for_manager(manager_id: UUID, status: str | None) -> list[dict]:
@@ -145,13 +164,13 @@ async def get_for_manager(manager_id: UUID, status: str | None) -> list[dict]:
         return []
     # Reports share the manager's tenant but could differ by region, so cache
     # holiday sets per region rather than assuming one.
-    cache: dict[UUID, list[dict]] = {}
+    cache: dict[UUID, RegionContext] = {}
     out = []
     for r in rows:
         emp = await employee_repository.find_by_id(r["employee_id"])
         region_id = emp["region_id"] if emp else manager["region_id"]
         if region_id not in cache:
-            cache[region_id] = await _holiday_rows_for_region(region_id)
+            cache[region_id] = await _region_context(region_id)
         out.append(_to_approval_dto(r, _breakdown_for(r, cache[region_id])))
     return out
 
@@ -164,8 +183,8 @@ async def get_team_on_leave(manager_id: UUID, on_day: date) -> list[dict]:
     rows = await leave_request_repository.find_on_leave(manager_id, on_day)
     if not rows:
         return []
-    holiday_rows = await _holiday_rows_for_region(manager["region_id"])
-    return [_to_approval_dto(r, _breakdown_for(r, holiday_rows)) for r in rows]
+    ctx = await _region_context(manager["region_id"])
+    return [_to_approval_dto(r, _breakdown_for(r, ctx)) for r in rows]
 
 
 # ============================ decide ============================
@@ -188,5 +207,5 @@ async def decide(request_id: UUID, new_status: str) -> dict:
     assert updated is not None
 
     employee = await employee_repository.find_by_id(updated["employee_id"])
-    holiday_rows = await _holiday_rows_for_region(employee["region_id"]) if employee else []
-    return _to_dto(updated, _breakdown_for(updated, holiday_rows))
+    ctx = await _region_context(employee["region_id"])
+    return _to_dto(updated, _breakdown_for(updated, ctx))

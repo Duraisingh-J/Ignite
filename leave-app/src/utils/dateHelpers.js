@@ -42,6 +42,14 @@ function buildHolidayLookup(holidays) {
   return { exact, annual };
 }
 
+// JS getUTCDay() is 0=Sun..6=Sat; Python's date.weekday() is 0=Mon..6=Sun.
+// The API speaks the Python numbering, so convert rather than store both.
+function jsDayToPy(jsDay) {
+  return (jsDay + 6) % 7;
+}
+
+const DEFAULT_WORK_DAYS = [0, 1, 2, 3, 4]; // Mon–Fri
+
 /**
  * Breaks a date range into calendar days / weekend days / holidays / chargeable days.
  *
@@ -51,21 +59,24 @@ function buildHolidayLookup(holidays) {
  * @param {string} startStr  "YYYY-MM-DD"
  * @param {string} endStr    "YYYY-MM-DD"
  * @param {Array<{date: string, recurrence?: string}>} holidays  region holidays
+ * @param {number[]} workDays  region working weekdays, Python numbering
  */
-export function calcLeaveBreakdown(startStr, endStr, holidays = []) {
+export function calcLeaveBreakdown(startStr, endStr, holidays = [], workDays) {
   if (!startStr || !endStr) return null;
   const days = dateRange(startStr, endStr);
   if (days.length === 0) return null;
 
   const { exact, annual } = buildHolidayLookup(holidays);
+  const working = new Set(workDays?.length ? workDays : DEFAULT_WORK_DAYS);
   let weekend = 0;
   let holiday = 0;
 
   days.forEach((d) => {
     const iso = d.toISOString().slice(0, 10);
-    const dow = d.getUTCDay(); // 0 = Sun, 6 = Sat
-    // Weekend wins: a holiday falling on a Saturday is counted once, not twice.
-    if (dow === 0 || dow === 6) weekend++;
+    // "Weekend" is whichever days this region does not work — not necessarily
+    // Saturday and Sunday.
+    if (!working.has(jsDayToPy(d.getUTCDay()))) weekend++;
+    // else-if, so a holiday on a non-working day is counted once, not twice.
     else if (exact.has(iso) || annual.has(iso.slice(5))) holiday++;
   });
 

@@ -68,6 +68,7 @@ export function toUiEmployee(e) {
     email: e.email,
     region: e.regionCountry,
     regionId: e.regionId,
+    regionWorkDays: e.regionWorkDays,
     tenantId: e.tenantId,
     managerId: e.managerId,
     manager: e.managerName,
@@ -173,4 +174,8 @@ export async function createHoliday(body) {
 
 export async function fetchRegions(tenantId = TENANT_ID) {
   return await request(`/regions?tenantId=${tenantId}`);
+}
+
+export async function createRegion(body) {
+  return await request(`/regions`, { method: "POST", body: JSON.stringify(body) });
 }

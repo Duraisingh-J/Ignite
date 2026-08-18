@@ -11,7 +11,7 @@ import SectionLabel from "../../components/SectionLabel";
 import FieldLabel from "../../components/FieldLabel";
 
 export default function ApplyLeave() {
-  const { leaveTypes, holidays, addRequest, loading, error: loadError } = useLeave();
+  const { employee, leaveTypes, holidays, addRequest, loading, error: loadError } = useLeave();
   const location = useLocation();
   const preselect = location.state?.preselect; // set when arriving from "Eligible Leave Types"
 
@@ -29,8 +29,8 @@ export default function ApplyLeave() {
   }, [leaveTypes, typeId]);
 
   const breakdown = useMemo(
-    () => calcLeaveBreakdown(start, end, holidays),
-    [start, end, holidays]
+    () => calcLeaveBreakdown(start, end, holidays, employee?.regionWorkDays),
+    [start, end, holidays, employee]
   );
 
   async function handleSubmit() {

@@ -89,3 +89,44 @@ INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_da
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
    'Vikram Rao',       'vikram.rao@meridian.io',       '2022-03-14')
 ON CONFLICT (id) DO NOTHING;
+
+-- =============================================================
+-- Additional regions. work_days uses Python date.weekday() numbers:
+--   0=Mon 1=Tue 2=Wed 3=Thu 4=Fri 5=Sat 6=Sun
+-- United Arab Emirates deliberately runs Sun-Thu, so the working-day
+-- engine is exercised against a non Mon-Fri week.
+-- =============================================================
+INSERT INTO region (id, tenant_id, code, country_name, work_days, timezone) VALUES
+  ('22222222-2222-2222-2222-222222222002', '11111111-1111-1111-1111-111111111111',
+   'US', 'United States',        '{0,1,2,3,4}', 'America/New_York'),
+  ('22222222-2222-2222-2222-222222222003', '11111111-1111-1111-1111-111111111111',
+   'UK', 'United Kingdom',       '{0,1,2,3,4}', 'Europe/London'),
+  ('22222222-2222-2222-2222-222222222004', '11111111-1111-1111-1111-111111111111',
+   'AE', 'United Arab Emirates', '{6,0,1,2,3}', 'Asia/Dubai')
+ON CONFLICT (id) DO NOTHING;
+
+-- Region-scoped leave types. Names deliberately differ per region.
+INSERT INTO leave_type (id, region_id, name, is_paid, is_active, requires_approval) VALUES
+  ('44444444-4444-4444-4444-444444444421', '22222222-2222-2222-2222-222222222002', 'PTO', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444422', '22222222-2222-2222-2222-222222222002', 'Sick Leave', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444423', '22222222-2222-2222-2222-222222222002', 'Parental Leave', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444431', '22222222-2222-2222-2222-222222222003', 'Annual Leave', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444432', '22222222-2222-2222-2222-222222222003', 'Sick Leave', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444433', '22222222-2222-2222-2222-222222222003', 'Compassionate Leave', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444441', '22222222-2222-2222-2222-222222222004', 'Annual Leave', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444442', '22222222-2222-2222-2222-222222222004', 'Sick Leave', TRUE, TRUE, TRUE)
+ON CONFLICT (region_id, name) DO NOTHING;
+
+-- Region-scoped holidays. ANNUAL entries repeat every year.
+INSERT INTO holiday_calendar (id, tenant_id, region_id, date, name, recurrence) VALUES
+  ('55555555-5555-5555-5555-555555555521', '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222002', '2026-07-04', 'Independence Day (US)', 'ANNUAL'),
+  ('55555555-5555-5555-5555-555555555522', '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222002', '2026-12-25', 'Christmas Day', 'ANNUAL'),
+  ('55555555-5555-5555-5555-555555555531', '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222003', '2026-12-25', 'Christmas Day', 'ANNUAL'),
+  ('55555555-5555-5555-5555-555555555532', '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222003', '2026-12-26', 'Boxing Day', 'ANNUAL'),
+  ('55555555-5555-5555-5555-555555555541', '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222004', '2026-12-02', 'UAE National Day', 'ANNUAL')
+ON CONFLICT (region_id, date) DO NOTHING;

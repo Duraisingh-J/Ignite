@@ -52,6 +52,8 @@ async def update(
     escalate_above_days: int | None = None,
     clear_escalation: bool = False,
     is_active: bool | None = None,
+    final_approver_role_id: UUID | None = None,
+    clear_final_approver_role: bool = False,
 ) -> dict:
     if await leave_type_repository.find_by_id(leave_type_id) is None:
         raise ApiError.not_found("Leave type not found")
@@ -61,6 +63,32 @@ async def update(
         escalate_above_days=escalate_above_days,
         clear_escalation=clear_escalation,
         is_active=is_active,
+        final_approver_role_id=final_approver_role_id,
+        clear_final_approver_role=clear_final_approver_role,
     )
     assert updated is not None
     return updated
+
+
+async def delete(leave_type_id: UUID) -> dict:
+    """Remove a leave type.
+
+    Refused once any request references it. Deleting would orphan that history,
+    and a past request must stay readable — so the offered alternative is to
+    deactivate, which hides the type from new requests while leaving every
+    existing one intact.
+    """
+    leave_type = await leave_type_repository.find_by_id(leave_type_id)
+    if leave_type is None:
+        raise ApiError.not_found("Leave type not found")
+
+    used = await leave_type_repository.request_count(leave_type_id)
+    if used > 0:
+        raise ApiError.conflict(
+            f"{used} leave request(s) use this type, so deleting it would erase "
+            "their history. Deactivate it instead to hide it from new requests.",
+            {"requestCount": used, "alternative": "PATCH isActive: false"},
+        )
+
+    await leave_type_repository.delete(leave_type_id)
+    return {"deleted": leave_type["name"]}

@@ -95,6 +95,7 @@ export function toUiLeaveType(t) {
     // "undefined approvals" and its controls never show the stored value.
     approvalLevels: t.approvalLevels ?? 1,
     escalateAboveDays: t.escalateAboveDays ?? null,
+    finalApproverRoleId: t.finalApproverRoleId ?? null,
   };
 }
 
@@ -214,6 +215,11 @@ export async function createEmployee(body) {
   return await request(`/employees`, { method: "POST", body: JSON.stringify(body) });
 }
 
+/** Refused (409) if they have direct reports or own a pending approval. */
+export async function deleteEmployee(id) {
+  return await request(`/employees/${id}`, { method: "DELETE" });
+}
+
 /** Partial update. Pass { clearManager: true } to detach a manager. */
 export async function updateEmployee(id, body) {
   return await request(`/employees/${id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -243,4 +249,42 @@ export async function fetchRegions(tenantId = TENANT_ID) {
 
 export async function createRegion(body) {
   return await request(`/regions`, { method: "POST", body: JSON.stringify(body) });
+}
+
+// ---------- roles ----------
+
+/** Roles with their holders. A role reaches approvers the reporting line cannot. */
+export async function fetchRoles(tenantId = TENANT_ID) {
+  return await request(`/roles?tenantId=${tenantId}`);
+}
+
+export async function createRole(body) {
+  return await request(`/roles`, { method: "POST", body: JSON.stringify(body) });
+}
+
+/** Refused (409) while a leave type still routes its final approval here. */
+export async function deleteRole(id) {
+  return await request(`/roles/${id}`, { method: "DELETE" });
+}
+
+/** regionId null = the whole tenant. */
+export async function addRoleHolder(roleId, body) {
+  return await request(`/roles/${roleId}/holders`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function removeRoleHolder(roleId, assignmentId) {
+  return await request(`/roles/${roleId}/holders/${assignmentId}`, { method: "DELETE" });
+}
+
+/** Refused (409) while employees are still assigned to the region. */
+export async function deleteRegion(id) {
+  return await request(`/regions/${id}`, { method: "DELETE" });
+}
+
+/** Refused (409) once any leave request uses the type — deactivate instead. */
+export async function deleteLeaveType(id) {
+  return await request(`/leave-types/${id}`, { method: "DELETE" });
 }

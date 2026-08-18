@@ -54,5 +54,13 @@ async def update_leave_type(leave_type_id: UUID, payload: LeaveTypeUpdate):
         escalate_above_days=payload.escalate_above_days,
         clear_escalation=payload.clear_escalation,
         is_active=payload.is_active,
+        final_approver_role_id=payload.final_approver_role_id,
+        clear_final_approver_role=payload.clear_final_approver_role,
     )
     return {"data": LeaveTypeOut.model_validate(updated, from_attributes=True)}
+
+
+@router.delete("/{leave_type_id}", response_model=DataResponse[dict])
+async def delete_leave_type(leave_type_id: UUID):
+    """Delete a leave type. Refused (409) once any request uses it."""
+    return {"data": await leave_type_service.delete(leave_type_id)}

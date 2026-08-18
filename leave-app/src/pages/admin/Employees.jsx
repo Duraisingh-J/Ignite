@@ -4,6 +4,7 @@ import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
 import {
   createEmployee,
+  deleteEmployee,
   fetchAllEmployees,
   fetchRegions,
   updateEmployee,
@@ -13,6 +14,26 @@ import Card from "../../components/Card";
 import Button from "../../components/Button";
 import SectionLabel from "../../components/SectionLabel";
 import FieldLabel from "../../components/FieldLabel";
+import DeleteButton from "../../components/DeleteButton";
+
+/**
+ * Would making `candidate` the manager of `employee` form a loop?
+ *
+ * Walks the candidate's reporting line upward; if it passes through the
+ * employee, the two would end up reporting to each other. Derived from the
+ * list already loaded, so the picker can hide impossible options instead of
+ * offering them and letting the server reject the choice.
+ */
+function wouldCycle(candidateId, employeeId, byId) {
+  let cursor = candidateId;
+  const seen = new Set();
+  while (cursor && !seen.has(cursor)) {
+    if (cursor === employeeId) return true;
+    seen.add(cursor);
+    cursor = byId.get(cursor)?.managerId ?? null;
+  }
+  return false;
+}
 
 const PAGE_SIZE = 25;
 // Large enough to list every colleague in the manager pickers without paging.
@@ -87,6 +108,20 @@ export default function Employees() {
     }
   }
 
+  async function handleDelete(emp) {
+    setError("");
+    try {
+      const res = await deleteEmployee(emp.id);
+      await load(meta.offset);
+      if (res.requestsRemoved) {
+        setError(`Removed ${res.deleted} and their ${res.requestsRemoved} leave request(s).`);
+      }
+    } catch (e) {
+      // Direct reports or a pending approval come back as 409.
+      setError(e.message);
+    }
+  }
+
   // Inline reassign from the table. "" means detach.
   async function handleReassign(employeeId, managerId) {
     setError("");
@@ -108,6 +143,12 @@ export default function Employees() {
   if (loading) {
     return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
   }
+
+  const byId = new Map(everyone.map((p) => [p.id, p]));
+  // Candidates for one employee: everyone except themselves and anyone who
+  // already reports to them, directly or through someone else.
+  const managerOptionsFor = (employeeId) =>
+    everyone.filter((m) => m.id !== employeeId && !wouldCycle(m.id, employeeId, byId));
 
   const th = {
     textAlign: "left",
@@ -190,6 +231,7 @@ export default function Employees() {
                 <th style={th}>Region</th>
                 <th style={th}>Reports to</th>
                 <th style={th}>Joined</th>
+                <th style={th} aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -202,19 +244,41 @@ export default function Employees() {
                     {/* Inline reassign — the server rejects cycles and self-reference. */}
                     <select
                       value={e.managerId ?? ""}
-                      disabled={savingId === e.id}
+                      disabled={savingId === e.id || managerOptionsFor(e.id).length === 0}
+                      title={
+                        managerOptionsFor(e.id).length === 0
+                          ? `Everyone else already reports to ${e.name}, directly or indirectly, so no one can be their manager`
+                          : undefined
+                      }
                       onChange={(ev) => handleReassign(e.id, ev.target.value)}
                       style={{ ...inputStyle, fontSize: 13, padding: "6px 8px", minWidth: 170 }}
                     >
                       <option value="">— No manager —</option>
-                      {everyone
-                        .filter((m) => m.id !== e.id)
-                        .map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))}
+                      {managerOptionsFor(e.id).map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
                     </select>
                   </td>
                   <td style={{ padding: "12px 16px", fontSize: 13, fontFamily: FONTS.mono, color: COLORS.inkSoft, whiteSpace: "nowrap" }}>{fmtDateFull(e.joinDate)}</td>
+                  {/* Widens only while the confirm is showing, so the column
+                      stays narrow the rest of the time. */}
+                  <td style={{ padding: "6px 12px", textAlign: "right", minWidth: 200 }}>
+                    <DeleteButton
+                      label={e.name}
+                      disabled={e.directReports > 0 || e.pendingApprovals > 0}
+                      disabledReason={
+                        e.directReports > 0
+                          ? `${e.directReports} employee(s) report to ${e.name} — reassign them first`
+                          : `${e.name} is the approver on ${e.pendingApprovals} pending request(s)`
+                      }
+                      warning={
+                        e.ownRequests
+                          ? `Also deletes their ${e.ownRequests} leave request(s).`
+                          : undefined
+                      }
+                      onConfirm={() => handleDelete(e)}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

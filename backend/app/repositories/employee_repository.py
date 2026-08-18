@@ -24,8 +24,18 @@ async def find_by_email(email: str) -> dict | None:
 
 
 async def find_by_tenant(tenant_id: UUID, limit: int, offset: int) -> list[dict]:
+    """List rows carry dependency counts so the admin table can block a delete
+    that would strand somebody else's leave."""
     return await fetch_all(
-        _BASE_SELECT + " WHERE e.tenant_id = %s ORDER BY e.name LIMIT %s OFFSET %s",
+        _BASE_SELECT.replace(
+            "           m.name AS manager_name",
+            """           m.name AS manager_name,
+           (SELECT count(*) FROM employee rp WHERE rp.manager_id = e.id) AS direct_reports,
+           (SELECT count(*) FROM leave_request lr WHERE lr.employee_id = e.id) AS own_requests,
+           (SELECT count(*) FROM leave_request_approval a
+             WHERE a.approver_id = e.id AND a.status = 'PENDING') AS pending_approvals""",
+        )
+        + " WHERE e.tenant_id = %s ORDER BY e.name LIMIT %s OFFSET %s",
         (tenant_id, limit, offset),
     )
 
@@ -138,3 +148,29 @@ async def management_chain(employee_id: UUID) -> list[UUID]:
         (employee_id,),
     )
     return [r["id"] for r in rows]
+
+
+async def dependents(employee_id: UUID) -> dict:
+    """What deleting this employee would affect.
+
+    Their own leave requests CASCADE (and take their approval chains with them).
+    Direct reports and any approval steps they own are SET NULL, which is the
+    dangerous case: a report with no manager, or a step with no approver, leaves
+    a request that no queue can ever surface.
+    """
+    row = await fetch_one(
+        """
+        SELECT (SELECT count(*) FROM employee r
+                 WHERE r.manager_id = %(e)s)                       AS direct_reports,
+               (SELECT count(*) FROM leave_request lr
+                 WHERE lr.employee_id = %(e)s)                     AS own_requests,
+               (SELECT count(*) FROM leave_request_approval a
+                 WHERE a.approver_id = %(e)s AND a.status = 'PENDING') AS pending_approvals
+        """,
+        {"e": employee_id},
+    )
+    return row or {"direct_reports": 0, "own_requests": 0, "pending_approvals": 0}
+
+
+async def delete(employee_id: UUID) -> None:
+    await fetch_one("DELETE FROM employee WHERE id = %s RETURNING id", (employee_id,))

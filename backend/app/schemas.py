@@ -79,6 +79,11 @@ class RegionOut(CamelModel):
     # Sun-Thu across much of the Gulf.
     work_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
     timezone: str = "UTC"
+    # Dependency counts, so the admin console can show what a delete would take
+    # with it — and block it outright while employees are still assigned.
+    employee_count: int = 0
+    leave_type_count: int = 0
+    holiday_count: int = 0
 
 
 class RegionCreate(CamelIn):
@@ -97,6 +102,38 @@ class RegionCreate(CamelIn):
         if len(set(self.work_days)) == 7:
             raise ValueError("workDays cannot be all seven days — there would be no weekend")
         return self
+
+
+# ============================ Role ============================
+class RoleHolderOut(CamelModel):
+    """One person holding a role, optionally scoped to a region."""
+
+    id: UUID
+    employee_id: UUID
+    employee_name: str
+    region_id: UUID | None
+    region_name: str | None
+
+
+class RoleOut(CamelModel):
+    id: UUID
+    tenant_id: UUID
+    code: str
+    name: str
+    holder_count: int = 0
+    holders: list[RoleHolderOut] = Field(default_factory=list)
+
+
+class RoleCreate(CamelIn):
+    tenant_id: UUID
+    code: str = Field(min_length=2, max_length=24)
+    name: str = Field(min_length=1, max_length=60)
+
+
+class RoleHolderCreate(CamelIn):
+    employee_id: UUID
+    # None means the whole tenant rather than one region.
+    region_id: UUID | None = None
 
 
 # ============================ Employee ============================
@@ -129,6 +166,11 @@ class EmployeeSummaryOut(CamelModel):
     # (two colleagues can share a name), the name renders without a lookup.
     manager_id: UUID | None
     manager_name: str | None
+    # Dependency counts so the admin table can block a delete that would
+    # strand somebody else's leave, and warn about what cascades.
+    direct_reports: int = 0
+    own_requests: int = 0
+    pending_approvals: int = 0
 
 
 class TeamMemberOut(CamelModel):
@@ -199,6 +241,8 @@ class LeaveTypeOut(CamelModel):
     # depth is region-specific without a separate policy table.
     approval_levels: int = 1
     escalate_above_days: int | None = None
+    # Optional final step resolved by role rather than by hierarchy.
+    final_approver_role_id: UUID | None = None
 
 
 class LeaveTypeCreate(CamelIn):
@@ -218,6 +262,8 @@ class LeaveTypeUpdate(CamelIn):
     escalate_above_days: int | None = Field(default=None, ge=1, le=365)
     clear_escalation: bool = False
     is_active: bool | None = None
+    final_approver_role_id: UUID | None = None
+    clear_final_approver_role: bool = False
 
 
 # ---------- Approval chain ----------
@@ -323,6 +369,13 @@ class ApprovalOut(CamelModel):
 
 
 # ============================ Stats ============================
+class BreakdownSlice(CamelModel):
+    """One slice of a categorical breakdown."""
+
+    label: str
+    value: int = Field(ge=0)
+
+
 class StatsOut(CamelModel):
     total_employees: int = Field(ge=0)
     pending_requests: int = Field(ge=0)
@@ -330,6 +383,11 @@ class StatsOut(CamelModel):
     leave_types: int = Field(ge=0)
     regions: int = Field(ge=0)
     holidays: int = Field(ge=0)
+    # Breakdowns for the dashboard charts. Empty lists when there is nothing
+    # to show — the UI renders an empty state rather than a fabricated slice.
+    requests_by_status: list[BreakdownSlice] = Field(default_factory=list)
+    employees_by_region: list[BreakdownSlice] = Field(default_factory=list)
+    requests_by_leave_type: list[BreakdownSlice] = Field(default_factory=list)
 
 
 # ============================ Envelopes ============================

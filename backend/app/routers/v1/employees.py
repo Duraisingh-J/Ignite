@@ -88,3 +88,14 @@ async def get_team(
     """A manager's direct reports, flagged with who is on leave that day."""
     rows = await employee_service.get_team(manager_id, on_date or date.today())
     return {"data": [TeamMemberOut.model_validate(r, from_attributes=True) for r in rows]}
+
+
+@router.delete("/{employee_id}", response_model=DataResponse[dict])
+async def delete_employee(employee_id: UUID):
+    """Delete an employee.
+
+    Refused (409) while they have direct reports or own a pending approval —
+    both would leave other people's requests unapprovable. Their own leave
+    requests cascade; the response reports how many.
+    """
+    return {"data": await employee_service.delete(employee_id)}

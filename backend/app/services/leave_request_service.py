@@ -147,6 +147,7 @@ async def submit(
         employee_id=employee_id,
         leave_type=leave_type,
         chargeable_days=breakdown.chargeable_days,
+        region_id=employee["region_id"],
     )
 
     # A chain that resolved to no reachable approver is already settled, so the

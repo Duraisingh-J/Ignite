@@ -19,6 +19,7 @@ from app.repositories import (
     approval_repository,
     employee_repository,
     leave_request_repository,
+    role_repository,
 )
 
 # step_order 1 is the direct manager, 2 the skip-level, 3 above that.
@@ -58,9 +59,24 @@ async def resolve_approvers(employee_id: UUID, levels: int) -> list[UUID | None]
 
 
 async def build_chain(
-    *, leave_request_id: UUID, employee_id: UUID, leave_type: dict, chargeable_days: int
+    *,
+    leave_request_id: UUID,
+    employee_id: UUID,
+    leave_type: dict,
+    chargeable_days: int,
+    region_id: UUID | None = None,
 ) -> list[dict]:
-    """Create and freeze the approval steps for a newly submitted request."""
+    """Create and freeze the approval steps for a newly submitted request.
+
+    Two different sources feed the chain:
+
+      * the reporting line, walked upward one rung per tier
+      * optionally a ROLE holder as the final step
+
+    The second exists because a hierarchy walk can never reach HR. Walking up
+    from an engineer yields their manager and their manager's manager forever;
+    HR is a role someone holds, not a rung above them.
+    """
     levels = required_levels(leave_type, chargeable_days)
     approvers = await resolve_approvers(employee_id, levels)
 
@@ -76,6 +92,30 @@ async def build_chain(
                 status="PENDING" if approver_id else "SKIPPED",
             )
         )
+
+    # Final role-based sign-off, resolved for the requester's own region so the
+    # same rule reaches India's HR for an Indian employee and the UAE's for a
+    # UAE one.
+    role_id = leave_type.get("final_approver_role_id")
+    if role_id and region_id:
+        holder = await role_repository.resolve_holder(role_id, region_id)
+        already = {a for a in approvers if a}
+        # If the role holder has already signed higher up the line, do not ask
+        # the same person twice.
+        if holder is None or holder["id"] in already:
+            status, approver = "SKIPPED", (holder["id"] if holder else None)
+        else:
+            status, approver = "PENDING", holder["id"]
+        steps.append(
+            await approval_repository.insert_step(
+                leave_request_id=leave_request_id,
+                step_order=len(approvers) + 1,
+                approver_id=approver,
+                approver_role="ROLE",
+                status=status,
+            )
+        )
+
     return steps
 
 

@@ -6,6 +6,7 @@ from app.routers.v1 import (
     leave_requests,
     leave_types,
     regions,
+    roles,
     stats,
 )
 
@@ -22,4 +23,5 @@ router.include_router(leave_requests.router)
 router.include_router(employees.router)
 router.include_router(holidays.router)
 router.include_router(regions.router)
+router.include_router(roles.router)
 router.include_router(stats.router)

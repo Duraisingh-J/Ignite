@@ -119,3 +119,43 @@ async def update(
     )
     assert updated is not None
     return updated
+
+
+async def delete(employee_id: UUID) -> dict:
+    """Remove an employee.
+
+    Blocked in two cases, both of which would silently strand other people's
+    leave rather than this employee's:
+
+      * direct reports  - their manager_id is SET NULL, so their requests can
+        no longer resolve an approver and never reach any queue
+      * pending approvals - the step's approver_id is SET NULL, leaving those
+        requests permanently undecidable
+
+    Their own leave requests cascade by design; the count is returned so the
+    caller can say what went with them.
+    """
+    employee = await employee_repository.find_by_id(employee_id)
+    if employee is None:
+        raise ApiError.not_found("Employee not found")
+
+    deps = await employee_repository.dependents(employee_id)
+
+    if deps["direct_reports"] > 0:
+        raise ApiError.conflict(
+            f"{deps['direct_reports']} employee(s) report to {employee['name']}. "
+            "Reassign them to another manager first, or their leave will have "
+            "nobody to approve it.",
+            {"directReports": deps["direct_reports"]},
+        )
+
+    if deps["pending_approvals"] > 0:
+        raise ApiError.conflict(
+            f"{employee['name']} is the approver on {deps['pending_approvals']} "
+            "pending request(s). Those would be left with no approver. Decide "
+            "them first, or reassign the requesters to another manager.",
+            {"pendingApprovals": deps["pending_approvals"]},
+        )
+
+    await employee_repository.delete(employee_id)
+    return {"deleted": employee["name"], "requestsRemoved": deps["own_requests"]}

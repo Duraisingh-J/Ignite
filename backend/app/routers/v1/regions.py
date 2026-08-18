@@ -24,3 +24,12 @@ async def create_region(payload: RegionCreate):
         timezone=payload.timezone.strip(),
     )
     return {"data": RegionOut.model_validate(created, from_attributes=True)}
+
+
+@router.delete("/{region_id}", response_model=DataResponse[dict])
+async def delete_region(region_id: UUID):
+    """Delete a region. Refused (409) while employees are assigned to it.
+
+    Its leave types and holidays cascade; the response reports how many.
+    """
+    return {"data": await region_service.delete(region_id)}

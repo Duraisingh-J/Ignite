@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { AlertCircle, Check, Globe } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
-import { createRegion, fetchRegions } from "../../api/leaveApi";
+import { createRegion, deleteRegion, fetchRegions } from "../../api/leaveApi";
 import { TENANT_ID } from "../../api/client";
 import Card from "../../components/Card";
 import Button from "../../components/Button";
 import SectionLabel from "../../components/SectionLabel";
 import FieldLabel from "../../components/FieldLabel";
+import DeleteButton from "../../components/DeleteButton";
 
 // date.weekday(): 0=Mon .. 6=Sun — the same numbering the backend uses.
 const DAYS = [
@@ -55,6 +56,24 @@ export default function Regions() {
         ? f.workDays.filter((x) => x !== d)
         : [...f.workDays, d].sort(),
     }));
+  }
+
+  async function handleDelete(r) {
+    setError("");
+    try {
+      const res = await deleteRegion(r.id);
+      setCreated(null);
+      await reload();
+      if (res.leaveTypesRemoved || res.holidaysRemoved) {
+        setError(
+          `Removed ${res.deleted}, along with ${res.leaveTypesRemoved} leave type(s) ` +
+          `and ${res.holidaysRemoved} holiday(s).`
+        );
+      }
+    } catch (e) {
+      // Employees still assigned come back as 409.
+      setError(e.message);
+    }
   }
 
   async function handleCreate() {
@@ -211,6 +230,9 @@ export default function Regions() {
               display: "flex",
               alignItems: "center",
               gap: 14,
+              // Lets the delete confirm drop to its own line instead of
+              // squeezing the region name.
+              flexWrap: "wrap",
               padding: "14px 20px",
               borderBottom: i < regions.length - 1 ? `1px solid ${COLORS.line}` : "none",
             }}
@@ -227,8 +249,22 @@ export default function Regions() {
               </div>
               <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.inkSoft }}>
                 Works {labelFor(r.workDays)} · {r.timezone}
+                {(r.employeeCount > 0 || r.leaveTypeCount > 0) && (
+                  <> · {r.employeeCount} employee{r.employeeCount === 1 ? "" : "s"}, {r.leaveTypeCount} leave type{r.leaveTypeCount === 1 ? "" : "s"}</>
+                )}
               </div>
             </div>
+            <DeleteButton
+              label={r.countryName}
+              disabled={r.employeeCount > 0}
+              disabledReason={`${r.employeeCount} employee(s) are assigned to this region — move them first`}
+              warning={
+                r.leaveTypeCount || r.holidayCount
+                  ? `Also removes ${r.leaveTypeCount} leave type(s) and ${r.holidayCount} holiday(s).`
+                  : undefined
+              }
+              onConfirm={() => handleDelete(r)}
+            />
           </div>
         ))}
       </Card>

@@ -3,6 +3,7 @@ import { AlertCircle, Check, Users } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import {
   createLeaveType,
+  deleteLeaveType,
   fetchAllLeaveTypes,
   fetchRegions,
   updateLeaveType,
@@ -12,6 +13,7 @@ import Button from "../../components/Button";
 import Badge from "../../components/Badge";
 import SectionLabel from "../../components/SectionLabel";
 import FieldLabel from "../../components/FieldLabel";
+import DeleteButton from "../../components/DeleteButton";
 
 export default function LeaveTypes() {
   const [types, setTypes] = useState([]);
@@ -70,6 +72,17 @@ export default function LeaveTypes() {
       setError(e.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleDelete(lt) {
+    setError("");
+    try {
+      await deleteLeaveType(lt.id);
+      await reload();
+    } catch (e) {
+      // In use by existing requests -> 409, with deactivate offered instead.
+      setError(e.message);
     }
   }
 
@@ -173,14 +186,17 @@ export default function LeaveTypes() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         {types.map((lt) => (
           <Card key={lt.id}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontFamily: FONTS.body, fontWeight: 600, fontSize: 15, color: COLORS.ink }}>{lt.label}</div>
                 <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.inkSoft }}>
                   {regionName(lt.regionId)} · {lt.isPaid ? "Paid" : "Unpaid"}
                 </div>
               </div>
-              {!lt.isActive && <Badge status="Cancelled" />}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
+                {!lt.isActive && <Badge status="Cancelled" />}
+                <DeleteButton label={lt.label} onConfirm={() => handleDelete(lt)} />
+              </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>

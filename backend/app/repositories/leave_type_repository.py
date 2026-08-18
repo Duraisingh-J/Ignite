@@ -4,7 +4,7 @@ from app.db import fetch_all, fetch_one
 
 _COLS = (
     "id, region_id, name, is_paid, is_active, requires_approval, "
-    "approval_levels, escalate_above_days"
+    "approval_levels, escalate_above_days, final_approver_role_id"
 )
 
 
@@ -74,6 +74,8 @@ async def update(
     escalate_above_days: int | None = None,
     clear_escalation: bool = False,
     is_active: bool | None = None,
+    final_approver_role_id: UUID | None = None,
+    clear_final_approver_role: bool = False,
 ) -> dict | None:
     """Partial update of a type's approval configuration.
 
@@ -92,6 +94,11 @@ async def update(
     if is_active is not None:
         sets.append("is_active = %s")
         params.append(is_active)
+    if clear_final_approver_role:
+        sets.append("final_approver_role_id = NULL")
+    elif final_approver_role_id is not None:
+        sets.append("final_approver_role_id = %s")
+        params.append(final_approver_role_id)
     if not sets:
         return await find_by_id(leave_type_id)
 
@@ -100,6 +107,18 @@ async def update(
         f"UPDATE leave_type SET {', '.join(sets)} WHERE id = %s RETURNING {_COLS}",
         tuple(params),
     )
+
+
+async def request_count(leave_type_id: UUID) -> int:
+    """How many leave requests reference this type. Non-zero blocks deletion."""
+    row = await fetch_one(
+        "SELECT count(*) AS n FROM leave_request WHERE leave_type_id = %s", (leave_type_id,)
+    )
+    return row["n"] if row else 0
+
+
+async def delete(leave_type_id: UUID) -> None:
+    await fetch_one("DELETE FROM leave_type WHERE id = %s RETURNING id", (leave_type_id,))
 
 
 async def count_by_tenant(tenant_id: UUID) -> int:

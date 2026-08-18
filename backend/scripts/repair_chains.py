@@ -70,6 +70,7 @@ async def main() -> int:
                 employee_id=r["employee_id"],
                 leave_type=leave_type,
                 chargeable_days=breakdown.chargeable_days,
+                region_id=r["region_id"],
             )
             print(
                 f"  + {r['employee_name']} · {leave_type['name']} · "

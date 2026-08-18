@@ -8,6 +8,8 @@ import Button from "../../components/Button";
 import SectionLabel from "../../components/SectionLabel";
 import FieldLabel from "../../components/FieldLabel";
 import DeleteButton from "../../components/DeleteButton";
+import CountrySelect from "../../components/CountrySelect";
+import ct from "countries-and-timezones";
 
 // date.weekday(): 0=Mon .. 6=Sun — the same numbering the backend uses.
 const DAYS = [
@@ -38,6 +40,32 @@ export default function Regions() {
     timezone: "UTC",
     workDays: [0, 1, 2, 3, 4],
   });
+  const [availableTimezones, setAvailableTimezones] = useState([{ id: "UTC", label: "(UTC+00:00) UTC", offset: 0 }]);
+
+  const handleCountryChange = (country) => {
+    const tzList = country.timezones || ["UTC"];
+    
+    // Map to rich objects and sort by UTC offset (West to East)
+    const enrichedTzList = tzList
+      .map(tz => {
+        const info = ct.getTimezone(tz);
+        return info ? { id: tz, label: `(UTC${info.utcOffsetStr}) ${tz}`, offset: info.utcOffset } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.offset - b.offset || a.id.localeCompare(b.id));
+
+    if (enrichedTzList.length === 0) {
+      enrichedTzList.push({ id: "UTC", label: "(UTC+00:00) UTC", offset: 0 });
+    }
+
+    setAvailableTimezones(enrichedTzList);
+    setForm((f) => ({
+      ...f,
+      countryName: country.name,
+      code: country.id,
+      timezone: enrichedTzList.length === 1 ? enrichedTzList[0].id : (enrichedTzList.some(t => t.id === f.timezone) ? f.timezone : enrichedTzList[0].id)
+    }));
+  };
 
   async function reload() {
     setRegions(await fetchRegions());
@@ -130,18 +158,16 @@ export default function Regions() {
             <FieldLabel>Code</FieldLabel>
             <input
               value={form.code}
+              readOnly
               placeholder="SG"
-              maxLength={8}
-              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-              style={{ ...inputStyle, fontFamily: FONTS.mono }}
+              style={{ ...inputStyle, fontFamily: FONTS.mono, backgroundColor: COLORS.paperDim, color: COLORS.inkSoft }}
             />
           </div>
           <div style={{ flex: 1 }}>
             <FieldLabel>Country name</FieldLabel>
-            <input
+            <CountrySelect
               value={form.countryName}
-              placeholder="Singapore"
-              onChange={(e) => setForm({ ...form, countryName: e.target.value })}
+              onChange={handleCountryChange}
               style={inputStyle}
             />
           </div>
@@ -149,12 +175,15 @@ export default function Regions() {
 
         <div style={{ marginBottom: 14 }}>
           <FieldLabel>Timezone</FieldLabel>
-          <input
+          <select
             value={form.timezone}
-            placeholder="Asia/Singapore"
             onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-            style={{ ...inputStyle, fontFamily: FONTS.mono }}
-          />
+            style={{ ...inputStyle, fontFamily: FONTS.mono, appearance: "auto" }}
+          >
+            {availableTimezones.map((tz) => (
+              <option key={tz.id} value={tz.id}>{tz.label}</option>
+            ))}
+          </select>
         </div>
 
         <FieldLabel>Working week</FieldLabel>

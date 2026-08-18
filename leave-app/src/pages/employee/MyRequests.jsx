@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { COLORS, FONTS } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
 import { useLeave } from "../../context/LeaveContext";
+import { chainToSteps, fetchApprovalChain } from "../../api/leaveApi";
 import Card from "../../components/Card";
 import Badge from "../../components/Badge";
 import SectionLabel from "../../components/SectionLabel";
 import RequestsTable from "../../components/RequestsTable";
+import Stepper from "../../components/Stepper";
 
 const FILTERS = ["All", "Pending", "Approved", "Rejected"];
 
@@ -14,6 +16,23 @@ export default function MyRequests() {
   const { requests, loading, error } = useLeave();
   const [filter, setFilter] = useState("All");
   const [selected, setSelected] = useState(null);
+  const [chain, setChain] = useState(null);
+
+  // The approval timeline is only needed when a request is opened, so it is
+  // fetched per request rather than loaded for the whole list.
+  useEffect(() => {
+    if (!selected) {
+      setChain(null);
+      return;
+    }
+    let cancelled = false;
+    fetchApprovalChain(selected.id)
+      .then((c) => !cancelled && setChain(c))
+      .catch(() => !cancelled && setChain([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   if (loading) {
     return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
@@ -59,6 +78,16 @@ export default function MyRequests() {
             </div>
           ))}
         </Card>
+
+        {/* The frozen approval chain: who was asked, in what order, and what they said. */}
+        {chain !== null && chain.length > 0 && (
+          <>
+            <SectionLabel eyebrow="Timeline">Approval progress</SectionLabel>
+            <Card style={{ marginBottom: 20 }}>
+              <Stepper steps={chainToSteps(chain)} />
+            </Card>
+          </>
+        )}
 
         {/* How the server arrived at the day count (weekends + region holidays removed). */}
         {b && (

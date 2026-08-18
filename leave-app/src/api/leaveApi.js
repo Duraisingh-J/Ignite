@@ -45,7 +45,41 @@ export function toUiApproval(a) {
     status: STATUS_TO_UI[a.status] ?? a.status,
     reason: a.reason ?? "",
     breakdown: a.breakdown,
+    // Which tier this approver is being asked to decide, out of how many.
+    stepId: a.stepId,
+    stepOrder: a.stepOrder,
+    totalSteps: a.totalSteps,
   };
+}
+
+const ROLE_LABEL = {
+  MANAGER: "Manager",
+  SKIP_LEVEL: "Skip-level",
+  DEPT_HEAD: "Department head",
+};
+
+/** API approval chain -> the { label, state, comment } shape Stepper expects. */
+export function chainToSteps(chain) {
+  const steps = [{ label: "Request submitted", state: "APPROVED" }];
+  for (const s of chain) {
+    const role = ROLE_LABEL[s.approverRole] ?? s.approverRole;
+    const who = s.approverName ?? "Unassigned";
+    let label = `${who} · ${role}`;
+    if (s.status === "APPROVED") label += " approved";
+    else if (s.status === "REJECTED") label += " rejected";
+    else if (s.status === "SKIPPED") {
+      // A step with nobody to route to, or one bypassed by a rejection above.
+      label = s.approverName ? `${who} · ${role} — not required` : `${role} — no approver in the reporting line`;
+    }
+    steps.push({
+      id: s.id,
+      label,
+      state: s.status,
+      comment: s.comment,
+      meta: s.decidedAt ? new Date(s.decidedAt).toLocaleString("en-GB") : undefined,
+    });
+  }
+  return steps;
 }
 
 /** API leave type -> the { id, label } shape the dropdown expects. */
@@ -57,6 +91,10 @@ export function toUiLeaveType(t) {
     isPaid: t.isPaid,
     isActive: t.isActive,
     requiresApproval: t.requiresApproval,
+    // Approval depth. Must be carried through, or the admin editor renders
+    // "undefined approvals" and its controls never show the stored value.
+    approvalLevels: t.approvalLevels ?? 1,
+    escalateAboveDays: t.escalateAboveDays ?? null,
   };
 }
 
@@ -96,11 +134,14 @@ export async function fetchMyRequests(id = EMPLOYEE_ID) {
   return rows.map(toUiRequest);
 }
 
-export async function submitLeaveRequest({ leaveTypeId, startDate, endDate, reason }) {
+export async function submitLeaveRequest(
+  { leaveTypeId, startDate, endDate, reason },
+  employeeId = EMPLOYEE_ID
+) {
   const created = await request(`/leave-requests`, {
     method: "POST",
     body: JSON.stringify({
-      employeeId: EMPLOYEE_ID,
+      employeeId,
       leaveTypeId,
       startDate,
       endDate,
@@ -112,10 +153,29 @@ export async function submitLeaveRequest({ leaveTypeId, startDate, endDate, reas
 
 // ---------- manager ----------
 
-export async function fetchApprovals(managerId = MANAGER_ID, status = "PENDING") {
-  const qs = status ? `&status=${status}` : "";
-  const rows = await request(`/leave-requests/approvals?managerId=${managerId}${qs}`);
+/** What is waiting on this person right now, across every tier of the chain. */
+export async function fetchApprovals(approverId = MANAGER_ID) {
+  const rows = await request(`/leave-requests/approvals?approverId=${approverId}`);
   return rows.map(toUiApproval);
+}
+
+/** The frozen approval chain for one request — feeds the Stepper. */
+export async function fetchApprovalChain(requestId) {
+  return await request(`/leave-requests/${requestId}/approvals`);
+}
+
+/** Decide one tier. `approve: false` rejects and ends the chain. */
+export async function decideApprovalStep(requestId, stepId, { approverId, approve, comment }) {
+  return await request(`/leave-requests/${requestId}/approvals/${stepId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ approverId, approve, comment }),
+  });
+}
+
+export async function updateLeaveType(id, body) {
+  return toUiLeaveType(
+    await request(`/leave-types/${id}`, { method: "PATCH", body: JSON.stringify(body) })
+  );
 }
 
 export async function fetchTeam(managerId = MANAGER_ID) {

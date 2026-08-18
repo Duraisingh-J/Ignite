@@ -18,7 +18,15 @@ export default function ApprovalCard({ a, onOpen, onApprove, onReject, compact, 
             {fmtDate(a.start)} – {fmtDate(a.end)} · {a.days} working day{a.days !== 1 ? "s" : ""}
           </div>
         </div>
-        <Badge status={a.status} />
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <Badge status={a.status} />
+          {/* Only meaningful on a multi-tier request. */}
+          {a.totalSteps > 1 && (
+            <div style={{ fontFamily: FONTS.mono, fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>
+              approval {a.stepOrder} of {a.totalSteps}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* The server's day calculation, so a manager can see why it's N days. */}

@@ -5,14 +5,17 @@ from fastapi import APIRouter, Query, status
 
 from app.errors import ApiError
 from app.schemas import (
+    ApprovalDecision,
     ApprovalOut,
+    ApprovalResultOut,
+    ApprovalStepOut,
     DataResponse,
     LeaveRequestCreate,
     LeaveRequestDecision,
     LeaveRequestOut,
     LeaveStatus,
 )
-from app.services import leave_request_service
+from app.services import approval_service, leave_request_service
 
 router = APIRouter(prefix="/leave-requests", tags=["leave-requests"])
 
@@ -40,13 +43,25 @@ async def list_leave_requests(employee_id: UUID = Query(..., alias="employeeId")
 
 @router.get("/approvals", response_model=DataResponse[list[ApprovalOut]])
 async def list_approvals(
-    manager_id: UUID = Query(..., alias="managerId"),
+    approver_id: UUID | None = Query(None, alias="approverId"),
+    manager_id: UUID | None = Query(None, alias="managerId"),
     request_status: LeaveStatus | None = Query(None, alias="status"),
 ):
-    """The manager's queue: requests raised by their direct reports."""
-    rows = await leave_request_service.get_for_manager(
-        manager_id, request_status.value if request_status else None
-    )
+    """What is waiting on one person right now.
+
+    `approverId` walks the approval chain, so it also surfaces tiers where the
+    caller is not the employee's direct manager. `managerId` is the older
+    direct-reports view, kept so existing callers keep working.
+    """
+    if approver_id is None and manager_id is None:
+        raise ApiError.bad_request('Provide either "approverId" or "managerId"')
+
+    if approver_id is not None:
+        rows = await leave_request_service.get_pending_for_approver(approver_id)
+    else:
+        rows = await leave_request_service.get_for_manager(
+            manager_id, request_status.value if request_status else None
+        )
     return {"data": [ApprovalOut.model_validate(r) for r in rows]}
 
 
@@ -60,8 +75,37 @@ async def list_on_leave(
     return {"data": [ApprovalOut.model_validate(r) for r in rows]}
 
 
+@router.get("/{request_id}/approvals", response_model=DataResponse[list[ApprovalStepOut]])
+async def get_approval_chain(request_id: UUID):
+    """The frozen approval chain for one request — drives the Stepper timeline."""
+    return {"data": [ApprovalStepOut.model_validate(s) for s in await approval_service.get_chain(request_id)]}
+
+
+@router.patch(
+    "/{request_id}/approvals/{step_id}", response_model=DataResponse[ApprovalResultOut]
+)
+async def decide_approval_step(request_id: UUID, step_id: UUID, payload: ApprovalDecision):
+    """Approve or reject one tier.
+
+    Rejected: 409 if the step is already decided, if the caller is not that
+    step's approver, or if an earlier tier is still outstanding.
+    """
+    result = await approval_service.decide_step(
+        step_id=step_id,
+        approver_id=payload.approver_id,
+        approve=payload.approve,
+        comment=payload.comment.strip() if payload.comment else None,
+    )
+    return {"data": ApprovalResultOut.model_validate(result)}
+
+
 @router.patch("/{request_id}", response_model=DataResponse[LeaveRequestOut])
 async def decide_leave_request(request_id: UUID, payload: LeaveRequestDecision):
-    """Approve, reject or cancel a request. Illegal transitions return 409."""
+    """Cancel a request, or decide it without naming a tier.
+
+    Kept so existing callers keep working. CANCELLED is applied directly;
+    APPROVED/REJECTED are routed through the current approval step so the chain
+    and leave_request.status can never disagree.
+    """
     updated = await leave_request_service.decide(request_id, payload.status.value)
     return {"data": LeaveRequestOut.model_validate(updated)}

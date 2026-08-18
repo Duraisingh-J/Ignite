@@ -116,6 +116,11 @@ async def update(
 async def management_chain(employee_id: UUID) -> list[UUID]:
     """Ids from this employee upward to the top of the reporting line.
 
+    Ordered by depth: index 0 is the employee, 1 the direct manager, 2 the
+    skip-level, and so on. Approval tiers are assigned from this order, so the
+    ORDER BY is load-bearing — without it Postgres may return the rows in any
+    order and tier 1 could end up being the skip-level.
+
     Uses a recursive CTE with a depth cap so a pre-existing cycle in the data
     cannot spin forever.
     """
@@ -128,7 +133,7 @@ async def management_chain(employee_id: UUID) -> list[UUID]:
               FROM employee e JOIN chain c ON e.id = c.manager_id
              WHERE c.depth < 50
         )
-        SELECT id FROM chain
+        SELECT id FROM chain ORDER BY depth
         """,
         (employee_id,),
     )

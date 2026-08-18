@@ -2,11 +2,19 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Briefcase, Bell } from "lucide-react";
 import { COLORS, FONTS } from "../theme/colors";
+import IdentitySwitcher from "./IdentitySwitcher";
+import { useSession } from "../context/SessionContext";
 
 // title: "Employee" | "Manager" | "Admin"
 // avatarLetter: single letter shown in the avatar circle
 // eligibleLink: optional { to } — shows the "Eligible Leave Types" quick link (employee only)
 export default function Topbar({ title, avatarLetter, eligibleLink }) {
+  // The avatar follows whoever you are acting as, so it cannot disagree with
+  // the switcher next to it. The prop is only a fallback before people load.
+  const { currentUserId, people } = useSession();
+  const me = people.find((p) => p.id === currentUserId);
+  const letter = me?.name?.[0]?.toUpperCase() ?? avatarLetter;
+
   return (
     <div
       style={{
@@ -33,7 +41,8 @@ export default function Topbar({ title, avatarLetter, eligibleLink }) {
           </>
         )}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <IdentitySwitcher />
         <Bell size={17} color={COLORS.inkSoft} />
         <div
           style={{
@@ -50,7 +59,7 @@ export default function Topbar({ title, avatarLetter, eligibleLink }) {
             color: COLORS.gold,
           }}
         >
-          {avatarLetter}
+          {letter}
         </div>
       </div>
     </div>

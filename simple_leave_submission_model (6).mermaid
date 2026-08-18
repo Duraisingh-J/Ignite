@@ -3,11 +3,12 @@ classDiagram
     %% Kept in step with backend/app/db/schema.sql. Update both together.
     %%
     %% Scope now covered: an employee sees a region-scoped leave type dropdown,
-    %% submits a request, and their manager approves or rejects it. Weekends and
-    %% region holidays are excluded from the chargeable day count.
+    %% submits a request, and it runs through a MULTI-TIER approval chain that is
+    %% resolved from the reporting line and frozen at submit. Weekends and region
+    %% holidays are excluded from the chargeable day count.
     %%
-    %% Still out of scope: balances/accrual, multi-tier approval chains,
-    %% authentication, half-days.
+    %% Still out of scope: balances/accrual, authentication, half-days,
+    %% role-based approvers (HR/Finance), parallel approvals, SLA escalation.
 
     class Tenant {
         +UUID id
@@ -53,7 +54,10 @@ classDiagram
         +Boolean isPaid
         +Boolean isActive
         +Boolean requiresApproval
+        +Int approvalLevels
+        +Int escalateAboveDays
         +getDropdownOptions(regionId) List~LeaveType~
+        +requiredLevels(chargeableDays) Int
     }
 
     class LeaveRequest {
@@ -68,6 +72,41 @@ classDiagram
         +DateTime submittedAt
         +submit() void
         +decide(status) void
+    }
+
+    class LeaveRequestApproval {
+        +UUID id
+        +UUID leaveRequestId
+        +Int stepOrder
+        +UUID approverId
+        +ApproverRole approverRole
+        +ApprovalStepStatus status
+        +String comment
+        +DateTime decidedAt
+        +decide(approverId, approve, comment) void
+    }
+
+    class ApprovalResolver {
+        <<service>>
+        +requiredLevels(leaveType, chargeableDays) Int
+        +resolveApprovers(employeeId, levels) List~UUID~
+        +buildChain(leaveRequestId, employeeId, leaveType, days) List~LeaveRequestApproval~
+        +deriveRequestStatus(leaveRequestId) LeaveStatus
+    }
+
+    class ApproverRole {
+        <<enumeration>>
+        MANAGER
+        SKIP_LEVEL
+        DEPT_HEAD
+    }
+
+    class ApprovalStepStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+        SKIPPED
     }
 
     class DayBreakdown {
@@ -126,6 +165,14 @@ classDiagram
     WorkingDayCalculator ..> Region : reads_workDays
     WorkingDayCalculator ..> DayBreakdown : produces
 
+    LeaveRequest "1" *-- "1..*" LeaveRequestApproval : frozen_chain
+    LeaveRequestApproval "*" --> "0..1" Employee : awaiting_decision_from
+    LeaveRequest ..> ApprovalResolver : chain_resolved_at_submit
+    ApprovalResolver ..> Employee : walks_reporting_line
+    ApprovalResolver ..> LeaveType : reads_approvalLevels
+    LeaveRequestApproval --> ApproverRole : has
+    LeaveRequestApproval --> ApprovalStepStatus : has
+
     LeaveRequest --> LeaveStatus : has
     HolidayCalendar --> Recurrence : has
 
@@ -147,3 +194,23 @@ classDiagram
     %%
     %% Employee.reports_to is optional and may cross regions. Cycles and
     %% self-reference are rejected by the service layer, not by the schema.
+    %%
+    %% ---- Multi-tier approval ----
+    %% TWO independent inputs decide a chain:
+    %%   WHO approves   -> the employee's own reporting line (per employee)
+    %%   HOW MANY tiers -> LeaveType.approvalLevels, plus one when the request
+    %%                     exceeds escalateAboveDays. Because LeaveType is
+    %%                     already region-scoped, depth is region-specific with
+    %%                     no separate policy table.
+    %%
+    %% The chain is FROZEN as LeaveRequestApproval rows at submit. If the org
+    %% chart changes mid-review an in-flight request must not change hands, and
+    %% the history has to stay answerable afterwards.
+    %%
+    %% LeaveRequest.status is DERIVED from the steps and must never be written
+    %% directly, or the two can disagree permanently. Any REJECTED step rejects
+    %% the request and SKIPs the rest; a step with no reachable approver is
+    %% SKIPPED rather than blocking the request forever.
+    %%
+    %% stepOrder allows duplicates by design, so parallel approvals ("any 2 of
+    %% 3") can be added later with a quorum column and no migration.

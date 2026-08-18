@@ -2,10 +2,13 @@
 // Wrap your route tree in <LeaveProvider> once (see App.jsx), then call useLeave()
 // from any page.
 //
-// Everything here is loaded from the v1 API — there is no mock data left in
-// this provider. Identities come from .env until authentication exists.
+// Everything here is loaded from the v1 API — there is no mock data left in this
+// provider. Identity comes from SessionContext, and every fetch is keyed to it:
+// switching person reloads the whole view, so one identity drives the employee
+// screens, the approvals queue, and the team views alike.
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
+  decideApprovalStep,
   decideLeaveRequest,
   fetchApprovals,
   fetchEmployee,
@@ -16,10 +19,13 @@ import {
   fetchTeamOnLeave,
   submitLeaveRequest,
 } from "../api/leaveApi";
+import { useSession } from "./SessionContext";
 
 const LeaveContext = createContext(null);
 
 export function LeaveProvider({ children }) {
+  const { currentUserId } = useSession();
+
   const [employee, setEmployee] = useState(null);
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [holidays, setHolidays] = useState([]);
@@ -33,43 +39,51 @@ export function LeaveProvider({ children }) {
   const [error, setError] = useState(null);
 
   const reloadRequests = useCallback(async () => {
-    setRequests(await fetchMyRequests());
-  }, []);
+    setRequests(await fetchMyRequests(currentUserId));
+  }, [currentUserId]);
 
-  // Manager views share one refresh so approving updates the team/calendar too.
+  // Approver views share one refresh so a decision updates the queue, the team
+  // list and the calendar together.
   const reloadManager = useCallback(async () => {
-    const [a, t, o] = await Promise.all([fetchApprovals(), fetchTeam(), fetchTeamOnLeave()]);
+    const [a, t, o] = await Promise.all([
+      fetchApprovals(currentUserId),
+      fetchTeam(currentUserId),
+      fetchTeamOnLeave(currentUserId),
+    ]);
     setApprovals(a);
     setTeam(t);
     setOnLeave(o);
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
 
     (async () => {
       try {
-        const emp = await fetchEmployee();
+        const emp = await fetchEmployee(currentUserId);
         if (cancelled) return;
         setEmployee(emp);
 
-        // Leave types and holidays are both scoped to the employee's region.
+        // Leave types and holidays are both scoped to this person's region, so
+        // switching to a UAE employee changes both.
         const [types, hols, reqs] = await Promise.all([
           fetchLeaveTypes(emp.regionId),
-          fetchHolidays(),
-          fetchMyRequests(),
+          fetchHolidays(currentUserId),
+          fetchMyRequests(currentUserId),
         ]);
         if (cancelled) return;
         setLeaveTypes(types);
         setHolidays(hols);
         setRequests(reqs);
 
-        // Manager data is secondary — a failure here shouldn't blank the
-        // employee screens, so it gets its own catch.
+        // Approver data is secondary — someone with no reports still needs the
+        // employee screens to work, so a failure here must not blank them.
         try {
           await reloadManager();
         } catch (e) {
-          console.warn("manager data unavailable:", e.message);
+          console.warn("approver data unavailable:", e.message);
         }
       } catch (e) {
         if (!cancelled) setError(e);
@@ -81,22 +95,42 @@ export function LeaveProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [reloadManager]);
+  }, [currentUserId, reloadManager]);
 
   // Submits to the API, then refreshes. Throws on failure so the calling page
   // can surface the server's message (overlap, all-weekend range, ...).
   async function addRequest({ leaveTypeId, startDate, endDate, reason }) {
-    const created = await submitLeaveRequest({ leaveTypeId, startDate, endDate, reason });
+    const created = await submitLeaveRequest(
+      { leaveTypeId, startDate, endDate, reason },
+      currentUserId
+    );
     await reloadRequests();
-    // A new request belongs in the manager queue too.
+    // A new request may land in someone's approval queue.
     reloadManager().catch(() => {});
     return created;
   }
 
-  // status: "APPROVED" | "REJECTED" | "CANCELLED"
-  async function decideApproval(id, status) {
-    const updated = await decideLeaveRequest(id, status);
+  /**
+   * Decide one tier of a request's approval chain, acting as the current user.
+   *
+   * The request only becomes APPROVED once every tier has signed off, so the
+   * result carries the re-derived request status rather than assuming this
+   * decision settled it.
+   */
+  async function decideStep(requestId, stepId, { approve, comment } = {}) {
+    const result = await decideApprovalStep(requestId, stepId, {
+      approverId: currentUserId,
+      approve,
+      comment: comment || null,
+    });
     await Promise.all([reloadManager(), reloadRequests()]);
+    return result;
+  }
+
+  // Employee withdrawing their own request. Bypasses the chain.
+  async function cancelRequest(id) {
+    const updated = await decideLeaveRequest(id, "CANCELLED");
+    await Promise.all([reloadRequests(), reloadManager().catch(() => {})]);
     return updated;
   }
 
@@ -111,7 +145,8 @@ export function LeaveProvider({ children }) {
     loading,
     error,
     addRequest,
-    decideApproval,
+    decideStep,
+    cancelRequest,
     reloadRequests,
     reloadManager,
   };

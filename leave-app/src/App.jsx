@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LeaveProvider } from "./context/LeaveContext";
+import { SessionProvider } from "./context/SessionContext";
 
 import EmployeeLayout from "./layouts/EmployeeLayout";
 import ManagerLayout from "./layouts/ManagerLayout";
@@ -27,8 +28,10 @@ import Regions from "./pages/admin/Regions";
 
 export default function App() {
   return (
-    <LeaveProvider>
-      <BrowserRouter>
+    // Session wraps Leave: switching person re-keys every fetch below it.
+    <SessionProvider>
+      <LeaveProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/" element={<Navigate to="/employee" replace />} />
 
@@ -56,8 +59,9 @@ export default function App() {
             <Route path="regions" element={<Regions />} />
             <Route path="holidays" element={<AdminHolidays />} />
           </Route>
-        </Routes>
-      </BrowserRouter>
-    </LeaveProvider>
+          </Routes>
+        </BrowserRouter>
+      </LeaveProvider>
+    </SessionProvider>
   );
 }

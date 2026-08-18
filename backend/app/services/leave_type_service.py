@@ -20,7 +20,14 @@ async def list_for_tenant(tenant_id: UUID) -> list[dict]:
 
 
 async def create(
-    *, region_id: UUID, name: str, is_paid: bool, is_active: bool, requires_approval: bool
+    *,
+    region_id: UUID,
+    name: str,
+    is_paid: bool,
+    is_active: bool,
+    requires_approval: bool,
+    approval_levels: int = 1,
+    escalate_above_days: int | None = None,
 ) -> dict:
     if await region_repository.find_by_id(region_id) is None:
         raise ApiError.bad_request("Unknown regionId")
@@ -33,4 +40,27 @@ async def create(
         is_paid=is_paid,
         is_active=is_active,
         requires_approval=requires_approval,
+        approval_levels=approval_levels,
+        escalate_above_days=escalate_above_days,
     )
+
+
+async def update(
+    leave_type_id: UUID,
+    *,
+    approval_levels: int | None = None,
+    escalate_above_days: int | None = None,
+    clear_escalation: bool = False,
+    is_active: bool | None = None,
+) -> dict:
+    if await leave_type_repository.find_by_id(leave_type_id) is None:
+        raise ApiError.not_found("Leave type not found")
+    updated = await leave_type_repository.update(
+        leave_type_id,
+        approval_levels=approval_levels,
+        escalate_above_days=escalate_above_days,
+        clear_escalation=clear_escalation,
+        is_active=is_active,
+    )
+    assert updated is not None
+    return updated

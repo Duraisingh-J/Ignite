@@ -195,6 +195,10 @@ class LeaveTypeOut(CamelModel):
     is_paid: bool
     is_active: bool
     requires_approval: bool
+    # Approval depth. Lives on the type, which is already region-scoped, so
+    # depth is region-specific without a separate policy table.
+    approval_levels: int = 1
+    escalate_above_days: int | None = None
 
 
 class LeaveTypeCreate(CamelIn):
@@ -203,6 +207,45 @@ class LeaveTypeCreate(CamelIn):
     is_paid: bool = True
     is_active: bool = True
     requires_approval: bool = True
+    approval_levels: int = Field(default=1, ge=1, le=3)
+    escalate_above_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class LeaveTypeUpdate(CamelIn):
+    """Partial update of a type's approval configuration."""
+
+    approval_levels: int | None = Field(default=None, ge=1, le=3)
+    escalate_above_days: int | None = Field(default=None, ge=1, le=365)
+    clear_escalation: bool = False
+    is_active: bool | None = None
+
+
+# ---------- Approval chain ----------
+class ApprovalStepOut(CamelModel):
+    id: UUID
+    step_order: int
+    approver_id: UUID | None
+    approver_name: str | None
+    approver_role: str
+    status: str
+    comment: str | None
+    decided_at: datetime | None
+
+
+class ApprovalDecision(CamelIn):
+    """One approver acting on one step of the chain."""
+
+    approver_id: UUID
+    approve: bool
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+class ApprovalResultOut(CamelModel):
+    request_id: UUID
+    step_id: UUID
+    step_status: str
+    # The request's status re-derived from the whole chain.
+    request_status: str
 
 
 # ============================ LeaveRequest ============================
@@ -258,7 +301,7 @@ class LeaveRequestOut(CamelModel):
 
 
 class ApprovalOut(CamelModel):
-    """A pending request enriched with who submitted it (manager queue)."""
+    """A request awaiting a decision, enriched with who submitted it."""
 
     id: UUID
     employee_id: UUID
@@ -272,6 +315,11 @@ class ApprovalOut(CamelModel):
     submitted_at: datetime
     working_days: int = Field(ge=0)
     breakdown: DayBreakdownOut
+    # Present when the row came from an approver's queue: which tier they are
+    # being asked to decide, and how many tiers the request has in total.
+    step_id: UUID | None = None
+    step_order: int | None = None
+    total_steps: int | None = None
 
 
 # ============================ Stats ============================

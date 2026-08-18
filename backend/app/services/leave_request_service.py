@@ -4,6 +4,7 @@ from uuid import UUID
 
 from app.errors import ApiError
 from app.repositories import (
+    approval_repository,
     employee_repository,
     holiday_repository,
     leave_request_repository,
@@ -136,6 +137,26 @@ async def submit(
         end_date=end_date,
         reason=reason,
     )
+
+    # Resolve and freeze the approval chain. Imported here rather than at module
+    # scope because approval_service also reaches into this module's repository.
+    from app.services import approval_service
+
+    await approval_service.build_chain(
+        leave_request_id=created["id"],
+        employee_id=employee_id,
+        leave_type=leave_type,
+        chargeable_days=breakdown.chargeable_days,
+    )
+
+    # A chain that resolved to no reachable approver is already settled, so the
+    # request must not sit at PENDING waiting on a queue nobody owns.
+    derived = await approval_service.derive_request_status(created["id"])
+    if derived != created["status"]:
+        updated = await leave_request_repository.update_status(created["id"], derived)
+        if updated is not None:
+            created = updated
+
     return _to_dto(created, breakdown)
 
 
@@ -175,6 +196,42 @@ async def get_for_manager(manager_id: UUID, status: str | None) -> list[dict]:
     return out
 
 
+async def get_pending_for_approver(approver_id: UUID) -> list[dict]:
+    """Requests waiting on this person right now.
+
+    Driven by the approval chain, not by manager_id: a tier-2 approver is not
+    the direct manager of the requests they have to sign off, so a manager_id
+    lookup would never show them.
+    """
+    approver = await employee_repository.find_by_id(approver_id)
+    if approver is None:
+        raise ApiError.not_found("Approver not found")
+
+    steps = await approval_repository.pending_for_approver(approver_id)
+    if not steps:
+        return []
+
+    cache: dict[UUID, RegionContext] = {}
+    out: list[dict] = []
+    for step in steps:
+        row = await leave_request_repository.find_by_id(step["leave_request_id"])
+        if row is None:
+            continue
+        emp = await employee_repository.find_by_id(row["employee_id"])
+        region_id = emp["region_id"] if emp else approver["region_id"]
+        if region_id not in cache:
+            cache[region_id] = await _region_context(region_id)
+
+        dto = _to_approval_dto(row, _breakdown_for(row, cache[region_id]))
+        # The step is what the UI acts on, so it has to travel with the request.
+        chain = await approval_repository.find_by_request(row["id"])
+        dto["stepId"] = step["id"]
+        dto["stepOrder"] = step["step_order"]
+        dto["totalSteps"] = len(chain)
+        out.append(dto)
+    return out
+
+
 async def get_team_on_leave(manager_id: UUID, on_day: date) -> list[dict]:
     manager = await employee_repository.find_by_id(manager_id)
     if manager is None:
@@ -189,7 +246,13 @@ async def get_team_on_leave(manager_id: UUID, on_day: date) -> list[dict]:
 
 # ============================ decide ============================
 async def decide(request_id: UUID, new_status: str) -> dict:
-    """Approve / reject / cancel a request, enforcing legal transitions."""
+    """Cancel a request, or decide it without naming a specific tier.
+
+    APPROVED/REJECTED are routed through the current approval step rather than
+    written straight to leave_request.status. Setting the status directly would
+    let a request read APPROVED while a step still reads PENDING, and the two
+    would stay contradictory forever.
+    """
     row = await leave_request_repository.find_by_id(request_id)
     if row is None:
         raise ApiError.not_found("Leave request not found")
@@ -203,7 +266,30 @@ async def decide(request_id: UUID, new_status: str) -> dict:
             {"allowed": sorted(_ALLOWED_TRANSITIONS[current])},
         )
 
-    updated = await leave_request_repository.update_status(request_id, new_status)
+    from app.services import approval_service
+
+    if new_status in ("APPROVED", "REJECTED"):
+        step = await approval_repository.current_step(request_id)
+        if step is None:
+            raise ApiError.conflict(
+                "This request has no outstanding approval step",
+                {"hint": "It may already be fully decided."},
+            )
+        if step["approver_id"] is None:
+            raise ApiError.conflict("The current approval step has no assigned approver")
+        # Act as that step's approver; the step machine re-derives the status.
+        await approval_service.decide_step(
+            step_id=step["id"],
+            approver_id=step["approver_id"],
+            approve=(new_status == "APPROVED"),
+            comment=None,
+        )
+        updated = await leave_request_repository.find_by_id(request_id)
+    else:
+        # CANCELLED is the employee withdrawing; it bypasses the chain, and any
+        # steps still pending become moot.
+        updated = await leave_request_repository.update_status(request_id, new_status)
+        await approval_repository.skip_remaining(request_id, 0)
     assert updated is not None
 
     employee = await employee_repository.find_by_id(updated["employee_id"])

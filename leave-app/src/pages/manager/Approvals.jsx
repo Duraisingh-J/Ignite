@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { AlertCircle, Check, X } from "lucide-react";
-import { COLORS, FONTS } from "../../theme/colors";
+import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
 import { useLeave } from "../../context/LeaveContext";
 import Card from "../../components/Card";
@@ -18,19 +18,30 @@ function ErrorBanner({ children }) {
 }
 
 export default function Approvals() {
-  const { approvals, team, decideApproval, loading } = useLeave();
+  const { approvals, team, decideStep, loading } = useLeave();
   const [opened, setOpened] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [note, setNote] = useState("");
+  const [comment, setComment] = useState("");
 
-  async function decide(id, status) {
+  async function decide(a, approve) {
     setError("");
+    setNote("");
     setBusy(true);
     try {
-      await decideApproval(id, status);
+      const res = await decideStep(a.id, a.stepId, { approve, comment });
+      setComment("");
       setOpened(null);
+      // An intermediate approval leaves the request pending on the next tier,
+      // so say so rather than implying it is settled.
+      setNote(
+        res.requestStatus === "PENDING"
+          ? `Recorded. This request still needs a further approval.`
+          : `Request ${res.requestStatus.toLowerCase()}.`
+      );
     } catch (e) {
-      // Illegal transitions (already decided elsewhere) surface here as 409.
+      // Already-decided steps and out-of-turn tiers come back as 409.
       setError(e.message);
     } finally {
       setBusy(false);
@@ -53,7 +64,11 @@ export default function Approvals() {
         >
           &larr; Back to approvals
         </button>
-        <SectionLabel>{a.employee}</SectionLabel>
+        <SectionLabel
+          eyebrow={a.totalSteps > 1 ? `Approval ${a.stepOrder} of ${a.totalSteps}` : "Approval"}
+        >
+          {a.employee}
+        </SectionLabel>
 
         <Card style={{ marginBottom: 16 }}>
           {[
@@ -95,13 +110,26 @@ export default function Approvals() {
           Reason: {a.reason || "-"}
         </div>
 
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontFamily: FONTS.body, fontSize: 12, fontWeight: 600, color: COLORS.inkSoft, marginBottom: 6 }}>
+            Comment (optional)
+          </div>
+          <textarea
+            rows={2}
+            value={comment}
+            placeholder="Recorded against your decision in the request timeline."
+            onChange={(e) => setComment(e.target.value)}
+            style={{ ...inputStyle, resize: "vertical", fontFamily: FONTS.body }}
+          />
+        </div>
+
         {error && <ErrorBanner>{error}</ErrorBanner>}
 
         <div style={{ display: "flex", gap: 10 }}>
-          <Button variant="success" disabled={busy} onClick={() => decide(a.id, "APPROVED")}>
+          <Button variant="success" disabled={busy} onClick={() => decide(a, true)}>
             <Check size={14} /> {busy ? "Saving..." : "Approve"}
           </Button>
-          <Button variant="danger" disabled={busy} onClick={() => decide(a.id, "REJECTED")}>
+          <Button variant="danger" disabled={busy} onClick={() => decide(a, false)}>
             <X size={14} /> Reject
           </Button>
         </div>
@@ -111,8 +139,14 @@ export default function Approvals() {
 
   return (
     <div>
-      <SectionLabel eyebrow={`${approvals.length} waiting`}>Pending approvals</SectionLabel>
+      <SectionLabel eyebrow={`${approvals.length} waiting on you`}>Pending approvals</SectionLabel>
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      {note && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", background: COLORS.tealSoft, borderRadius: 8, padding: "10px 12px", marginBottom: 16 }}>
+          <Check size={15} color={COLORS.teal} strokeWidth={3} />
+          <span style={{ fontFamily: FONTS.body, fontSize: 13, color: COLORS.teal }}>{note}</span>
+        </div>
+      )}
       {approvals.length === 0 ? (
         <Card style={{ textAlign: "center", color: COLORS.inkSoft, fontFamily: FONTS.body }}>
           Nothing pending. You are all caught up.
@@ -121,12 +155,15 @@ export default function Approvals() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {approvals.map((x) => (
             <ApprovalCard
-              key={x.id}
+              key={x.stepId ?? x.id}
               a={x}
               busy={busy}
-              onApprove={() => decide(x.id, "APPROVED")}
-              onReject={() => decide(x.id, "REJECTED")}
-              onOpen={() => setOpened(x.id)}
+              onApprove={() => decide(x, true)}
+              onReject={() => decide(x, false)}
+              onOpen={() => {
+                setComment("");
+                setOpened(x.id);
+              }}
             />
           ))}
         </div>

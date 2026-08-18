@@ -26,6 +26,8 @@ import Policies from "./pages/admin/Policies";
 import AdminHolidays from "./pages/admin/Holidays";
 import Regions from "./pages/admin/Regions";
 
+import Login from "./pages/auth/Login";
+
 export default function App() {
   return (
     // Session wraps Leave: switching person re-keys every fetch below it.
@@ -33,7 +35,9 @@ export default function App() {
       <LeaveProvider>
         <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/employee" replace />} />
+          {/* Temporary default route for dev; production would check auth status */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
 
           <Route path="/employee" element={<EmployeeLayout />}>
             <Route index element={<EmployeeDashboard />} />

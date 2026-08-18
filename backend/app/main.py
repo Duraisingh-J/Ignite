@@ -68,6 +68,9 @@ def create_app() -> FastAPI:
     # Versioned surface. A future v2 mounts alongside this one.
     app.include_router(v1_router)
 
+    from app.routers.auth import router as auth_router
+    app.include_router(auth_router, prefix="/api")
+
     return app
 
 

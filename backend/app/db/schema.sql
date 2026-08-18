@@ -7,6 +7,7 @@
 -- Idempotent: safe to re-run.
 -- =============================================================
 
+DROP TABLE IF EXISTS leave_request_approval CASCADE;
 DROP TABLE IF EXISTS leave_request CASCADE;
 DROP TABLE IF EXISTS leave_type CASCADE;
 DROP TABLE IF EXISTS holiday_calendar CASCADE;
@@ -26,6 +27,8 @@ CREATE TABLE region (
     tenant_id     UUID NOT NULL REFERENCES tenant(id) ON DELETE CASCADE,
     code          TEXT NOT NULL,
     country_name  TEXT NOT NULL,
+    work_days     SMALLINT[] NOT NULL DEFAULT '{0,1,2,3,4}',
+    timezone      TEXT NOT NULL DEFAULT 'UTC',
     UNIQUE (tenant_id, code)
 );
 
@@ -52,7 +55,9 @@ CREATE TABLE employee (
     region_id   UUID NOT NULL REFERENCES region(id),
     name        TEXT NOT NULL,
     email       TEXT NOT NULL UNIQUE,
-    join_date   DATE NOT NULL
+    join_date   DATE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role        TEXT NOT NULL DEFAULT 'EMPLOYEE' CHECK (role IN ('ADMIN', 'HR_ADMIN', 'MANAGER', 'EMPLOYEE'))
 );
 
 -- ---------- LeaveType (region-scoped, per v1 model) ----------

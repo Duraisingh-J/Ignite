@@ -351,3 +351,15 @@ class PageMeta(CamelModel):
 class PagedResponse(BaseModel, Generic[T]):
     data: list[T]
     meta: PageMeta
+
+# --- Auth Schemas ---
+
+class LoginRequest(CamelModel):
+    email: str
+    password: str
+    organization: str | None = None
+
+class Token(CamelModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str

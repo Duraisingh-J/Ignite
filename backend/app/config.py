@@ -1,14 +1,24 @@
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import quote
 
+# pyrefly: ignore [missing-import]
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve .env relative to this file (backend/.env), not the shell's CWD.
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 
     port: int = 4000
     cors_origins: str = "http://localhost:5173"
+
+    # JWT Authentication
+    jwt_secret: str  # Loaded from .env
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 60 * 24  # 1 day
 
     # DATABASE_URL wins when set; otherwise assembled from the PG* fields.
     database_url: str | None = None

@@ -6,6 +6,7 @@ Run: python -m scripts.seed
 import sys
 from pathlib import Path
 
+# pyrefly: ignore [missing-import]
 import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -18,11 +19,15 @@ SEED_PATH = Path(__file__).resolve().parent.parent / "app" / "db" / "seed.sql"
 def main() -> int:
     try:
         sql = SEED_PATH.read_text(encoding="utf-8")
+        # psycopg cursor.execute() only handles a single statement at a time.
+        # Split on ";" and execute each non-empty statement individually.
+        statements = [s.strip() for s in sql.split(";") if s.strip()]
         with psycopg.connect(settings.dsn()) as conn:
             with conn.cursor() as cur:
-                cur.execute(sql)
+                for stmt in statements:
+                    cur.execute(stmt)
             conn.commit()
-        print("[seed] done")
+        print(f"[seed] done — {len(statements)} statement(s) applied")
         return 0
     except Exception as exc:  # noqa: BLE001
         print(f"[seed] failed: {exc}", file=sys.stderr)

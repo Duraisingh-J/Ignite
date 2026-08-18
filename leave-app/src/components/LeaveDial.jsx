@@ -27,7 +27,14 @@ export default function LeaveDial({
   const atCap = cap > 0 && value >= cap;
 
   return (
-    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+    // The label lives on the container rather than in a visually-hidden span:
+    // this app styles inline and has no utility stylesheet, so a `sr-only`
+    // class would not be hidden — it would simply render.
+    <div
+      role="img"
+      aria-label={`${label}: ${value} days available${cap ? ` of a ${cap} day cap` : ""}`}
+      style={{ position: "relative", width: size, height: size, flexShrink: 0 }}
+    >
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }} aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} stroke={COLORS.line} strokeWidth={6} fill="none" />
         <circle
@@ -62,9 +69,6 @@ export default function LeaveDial({
           </div>
         )}
       </div>
-      <span className="sr-only">
-        {label}: {value} days available{cap ? ` of a ${cap} day cap` : ""}
-      </span>
     </div>
   );
 }

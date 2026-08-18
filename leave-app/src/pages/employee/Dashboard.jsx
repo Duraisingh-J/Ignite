@@ -38,6 +38,11 @@ export default function EmployeeDashboard() {
   // A type with no accrual policy has no balance to show, so it is left out
   // rather than rendered as a zero that looks like an exhausted allowance.
   const withPolicy = (balances ?? []).filter((b) => b.policyName);
+  // Nothing accrued yet is a different state from nothing left: this employee
+  // has policies but the runner has not been past. Saying so beats three dials
+  // reading zero, which looks like an exhausted allowance.
+  const notYetAccrued =
+    withPolicy.length > 0 && withPolicy.every((b) => Number(b.accrued) === 0);
 
   return (
     <div>
@@ -53,12 +58,28 @@ export default function EmployeeDashboard() {
       {withPolicy.length > 0 && (
         <>
           <SectionLabel eyebrow="Balance">Available leave</SectionLabel>
+
+          {notYetAccrued && (
+            <Card style={{ background: COLORS.paperDim, border: "none", marginBottom: 16 }}>
+              <div style={{ fontFamily: FONTS.body, fontSize: 13.5, color: COLORS.ink, marginBottom: 8 }}>
+                No leave has accrued for {employee?.name} yet.
+              </div>
+              <div style={{ fontFamily: FONTS.body, fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 12 }}>
+                Policies are configured, but the accrual runner has not been past
+                this employee. Run it to fill in every period since they joined.
+              </div>
+              <Button variant="ghost" onClick={() => navigate("/employee/balance")} style={{ fontSize: 13 }}>
+                Go to Balance to run it
+              </Button>
+            </Card>
+          )}
+
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
               gap: 16,
-              marginBottom: 32,
+              marginBottom: 10,
             }}
           >
             {withPolicy.map((b, i) => (
@@ -89,7 +110,7 @@ export default function EmployeeDashboard() {
               </Card>
             ))}
           </div>
-          <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.inkSoft, marginTop: -22, marginBottom: 30 }}>
+          <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.inkSoft, marginBottom: 32 }}>
             The ring fills against the point at which accrual stops.{" "}
             <button
               onClick={() => navigate("/employee/balance")}

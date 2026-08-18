@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { AlertCircle } from "lucide-react";
 import { COLORS, FONTS } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
+import { useNavigate } from "react-router-dom";
 import { useLeave } from "../../context/LeaveContext";
 import { chainToSteps, fetchApprovalChain } from "../../api/leaveApi";
 import Card from "../../components/Card";
@@ -34,9 +37,7 @@ export default function MyRequests() {
     };
   }, [selected]);
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   if (error) {
     return (
@@ -147,7 +148,13 @@ export default function MyRequests() {
         ))}
       </div>
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: 20 }}>
+            <ShimmerBlock height={40} style={{ marginBottom: 12 }} />
+            <ShimmerBlock height={40} style={{ marginBottom: 12 }} />
+            <ShimmerBlock height={40} />
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", fontFamily: FONTS.body, color: COLORS.inkSoft, fontSize: 14 }}>
             No {filter.toLowerCase()} requests yet.
           </div>

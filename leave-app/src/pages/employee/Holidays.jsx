@@ -1,4 +1,5 @@
 import React from "react";
+import ShimmerBlock from '../../components/ShimmerBlock';
 import { Repeat, Sun } from "lucide-react";
 import { COLORS, FONTS } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
@@ -9,15 +10,17 @@ import SectionLabel from "../../components/SectionLabel";
 export default function Holidays() {
   const { employee, holidays, loading } = useLeave();
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
-
   return (
     <div>
       <SectionLabel eyebrow={`Region: ${employee?.region ?? "—"}`}>Holiday calendar</SectionLabel>
       <Card>
-        {holidays.length === 0 ? (
+        {loading ? (
+          <>
+            <ShimmerBlock height={50} style={{ margin: "14px 0" }} />
+            <ShimmerBlock height={50} style={{ margin: "14px 0" }} />
+            <ShimmerBlock height={50} style={{ margin: "14px 0" }} />
+          </>
+        ) : holidays.length === 0 ? (
           <div style={{ fontFamily: FONTS.body, fontSize: 14, color: COLORS.inkSoft, padding: "8px 0" }}>
             No holidays configured for this region.
           </div>

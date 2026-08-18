@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { AlertCircle } from "lucide-react";
 import { COLORS, FONTS } from "../../theme/colors";
 import { fetchStats } from "../../api/leaveApi";
@@ -30,21 +32,19 @@ export default function AdminDashboard() {
       </div>
     );
   }
-  if (!stats) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   // Every figure below is counted in SQL — nothing here is hardcoded.
   const tiles = [
-    ["Total employees", stats.totalEmployees, COLORS.navy],
-    ["Pending requests", stats.pendingRequests, COLORS.gold],
-    ["On leave today", stats.employeesOnLeaveToday, COLORS.teal],
-    ["Leave types", stats.leaveTypes, COLORS.navy],
-    ["Regions", stats.regions, COLORS.inkSoft],
-    ["Holidays", stats.holidays, COLORS.inkSoft],
+    ["Total employees", stats?.totalEmployees ?? 0, COLORS.navy],
+    ["Pending requests", stats?.pendingRequests ?? 0, COLORS.gold],
+    ["On leave today", stats?.employeesOnLeaveToday ?? 0, COLORS.teal],
+    ["Leave types", stats?.leaveTypes ?? 0, COLORS.navy],
+    ["Regions", stats?.regions ?? 0, COLORS.inkSoft],
+    ["Holidays", stats?.holidays ?? 0, COLORS.inkSoft],
   ];
 
-  const statusSlices = (stats.requestsByStatus ?? []).map((s) => ({
+  const statusSlices = (stats?.requestsByStatus ?? []).map((s) => ({
     label: STATUS_LABEL[s.label] ?? s.label,
     value: s.value,
     key: s.label,
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
 
       {/* Totals. The rings below break these down; they never restate them. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 32 }}>
-        {tiles.map(([label, val, color]) => (
+        {!stats ? (<><ShimmerBlock height={100} borderRadius={12}/><ShimmerBlock height={100} borderRadius={12}/><ShimmerBlock height={100} borderRadius={12}/><ShimmerBlock height={100} borderRadius={12}/><ShimmerBlock height={100} borderRadius={12}/><ShimmerBlock height={100} borderRadius={12}/></>) : tiles.map(([label, val, color]) => (
           <Card key={label} style={{ textAlign: "center" }}>
             <div style={{ fontFamily: FONTS.mono, fontWeight: 700, fontSize: 26, color, fontVariantNumeric: "tabular-nums" }}>
               {val}
@@ -68,25 +68,35 @@ export default function AdminDashboard() {
 
       <SectionLabel eyebrow="Breakdowns">How it splits</SectionLabel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(330px, 1fr))", gap: 16 }}>
-        <Donut
-          title="Leave requests by status"
-          centerLabel="requests"
-          slices={statusSlices}
-          // Reserved status palette: these encode state, not identity.
-          colors={(s) => STATUS_COLORS[s.key] ?? STATUS_COLORS.CANCELLED}
-        />
-        <Donut
-          title="Employees by region"
-          centerLabel="employees"
-          slices={stats.employeesByRegion ?? []}
-          colors={CATEGORICAL}
-        />
-        <Donut
-          title="Requests by leave type"
-          centerLabel="requests"
-          slices={stats.requestsByLeaveType ?? []}
-          colors={CATEGORICAL}
-        />
+        {!stats ? (
+          <>
+             <ShimmerBlock height={250} borderRadius={12} />
+             <ShimmerBlock height={250} borderRadius={12} />
+             <ShimmerBlock height={250} borderRadius={12} />
+          </>
+        ) : (
+          <>
+            <Donut
+              title="Leave requests by status"
+              centerLabel="requests"
+              slices={statusSlices}
+              // Reserved status palette: these encode state, not identity.
+              colors={(s) => STATUS_COLORS[s.key] ?? STATUS_COLORS.CANCELLED}
+            />
+            <Donut
+              title="Employees by region"
+              centerLabel="employees"
+              slices={stats?.employeesByRegion ?? []}
+              colors={CATEGORICAL}
+            />
+            <Donut
+              title="Requests by leave type"
+              centerLabel="requests"
+              slices={stats?.requestsByLeaveType ?? []}
+              colors={CATEGORICAL}
+            />
+          </>
+        )}
       </div>
 
       <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.inkSoft, marginTop: 14, maxWidth: 640 }}>

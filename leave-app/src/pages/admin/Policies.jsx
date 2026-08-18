@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { AlertCircle } from "lucide-react";
 import { COLORS, FONTS } from "../../theme/colors";
 import { fetchAllLeaveTypes, fetchRegions } from "../../api/leaveApi";
@@ -21,9 +23,7 @@ export default function Policies() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
   if (error) {
     return (
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: COLORS.claySoft, borderRadius: 8, padding: "12px 14px", maxWidth: 480 }}>

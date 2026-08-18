@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { AlertCircle, Check } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
@@ -140,9 +142,7 @@ export default function Employees() {
     }
   }
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   const byId = new Map(everyone.map((p) => [p.id, p]));
   // Candidates for one employee: everyone except themselves and anyone who

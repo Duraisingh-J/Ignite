@@ -1,4 +1,6 @@
-import React from "react";
+import React from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { useNavigate } from "react-router-dom";
 import { MapPin, Plus } from "lucide-react";
 import { COLORS, FONTS } from "../../theme/colors";
@@ -13,9 +15,7 @@ export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const { employee, requests, holidays, loading } = useLeave();
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   // All figures are derived from live data. There is no balance concept in the
   // current schema, so no balance is shown rather than an invented one.
@@ -51,7 +51,14 @@ export default function EmployeeDashboard() {
 
       <SectionLabel eyebrow="Your requests">Leave summary</SectionLabel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 32 }}>
-        {[
+        {loading ? (
+          <>
+            <ShimmerBlock height={80} borderRadius={12} />
+            <ShimmerBlock height={80} borderRadius={12} />
+            <ShimmerBlock height={80} borderRadius={12} />
+            <ShimmerBlock height={80} borderRadius={12} />
+          </>
+        ) : [
           ["Pending", summary.pending, COLORS.gold],
           ["Approved", summary.approved, COLORS.teal],
           ["Rejected", summary.rejected, COLORS.clay],
@@ -66,7 +73,13 @@ export default function EmployeeDashboard() {
 
       <SectionLabel eyebrow="Activity">Recent requests</SectionLabel>
       <Card style={{ padding: 0, overflow: "hidden", marginBottom: 32 }}>
-        {requests.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: 20 }}>
+            <ShimmerBlock height={40} style={{ marginBottom: 12 }} />
+            <ShimmerBlock height={40} style={{ marginBottom: 12 }} />
+            <ShimmerBlock height={40} />
+          </div>
+        ) : requests.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", fontFamily: FONTS.body, color: COLORS.inkSoft, fontSize: 14 }}>
             No requests yet.
           </div>

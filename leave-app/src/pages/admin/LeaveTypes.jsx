@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { AlertCircle, Check, Users } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import {
@@ -101,9 +103,7 @@ export default function LeaveTypes() {
     }
   }
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   const regionName = (id) => regions.find((r) => r.id === id)?.countryName ?? "—";
 

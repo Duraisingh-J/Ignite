@@ -1,4 +1,6 @@
-import React from "react";
+import React from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { COLORS, FONTS } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
 import { useLeave } from "../../context/LeaveContext";
@@ -9,15 +11,19 @@ import SectionLabel from "../../components/SectionLabel";
 export default function Team() {
   const { team, loading } = useLeave();
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   return (
     <div>
       <SectionLabel eyebrow={`${team.length} direct reports`}>Team</SectionLabel>
       <Card style={{ padding: 0, overflow: "hidden" }}>
-        {team.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: 20 }}>
+            <ShimmerBlock height={50} style={{ marginBottom: 12 }} />
+            <ShimmerBlock height={50} style={{ marginBottom: 12 }} />
+            <ShimmerBlock height={50} />
+          </div>
+        ) : team.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", fontFamily: FONTS.body, color: COLORS.inkSoft, fontSize: 14 }}>
             No direct reports.
           </div>

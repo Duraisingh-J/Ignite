@@ -1,4 +1,6 @@
-import React from "react";
+import React from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONTS } from "../../theme/colors";
 import { useLeave } from "../../context/LeaveContext";
@@ -10,9 +12,7 @@ export default function ManagerDashboard() {
   const navigate = useNavigate();
   const { approvals, team, loading } = useLeave();
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   const onLeaveCount = team.filter((t) => t.onLeave).length;
 
@@ -20,7 +20,13 @@ export default function ManagerDashboard() {
     <div>
       <SectionLabel eyebrow="Manager">Manager dashboard</SectionLabel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
-        {[
+        {loading ? (
+          <>
+            <ShimmerBlock height={80} borderRadius={12} />
+            <ShimmerBlock height={80} borderRadius={12} />
+            <ShimmerBlock height={80} borderRadius={12} />
+          </>
+        ) : [
           ["Pending approvals", approvals.length, COLORS.gold],
           ["Team members", team.length, COLORS.navy],
           ["On leave today", onLeaveCount, COLORS.teal],
@@ -39,7 +45,9 @@ export default function ManagerDashboard() {
         </Card>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {approvals.slice(0, 2).map((a) => (
+          {loading ? (
+             <ShimmerBlock height={120} borderRadius={12} />
+          ) : approvals.slice(0, 2).map((a) => (
             <ApprovalCard key={a.id} a={a} onOpen={() => navigate("/manager/approvals")} compact />
           ))}
         </div>

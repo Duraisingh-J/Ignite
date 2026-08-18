@@ -1,4 +1,6 @@
-import React from "react";
+import React from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { COLORS, FONTS } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
 import { useLeave } from "../../context/LeaveContext";
@@ -8,9 +10,7 @@ import SectionLabel from "../../components/SectionLabel";
 export default function Calendar() {
   const { onLeave, loading } = useLeave();
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   return (
     <div>
@@ -19,7 +19,12 @@ export default function Calendar() {
         <div style={{ fontFamily: FONTS.body, fontSize: 14, color: COLORS.inkSoft, marginBottom: 12 }}>
           Who is out, at a glance. Only approved leave appears here.
         </div>
-        {onLeave.length === 0 ? (
+        {loading ? (
+          <>
+            <ShimmerBlock height={30} style={{ margin: "8px 0" }} />
+            <ShimmerBlock height={30} style={{ margin: "8px 0" }} />
+          </>
+        ) : onLeave.length === 0 ? (
           <div style={{ fontFamily: FONTS.body, fontSize: 14, color: COLORS.inkSoft, padding: "8px 0" }}>
             Nobody is on approved leave today.
           </div>

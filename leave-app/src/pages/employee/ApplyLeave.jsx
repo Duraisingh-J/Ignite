@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { useLocation } from "react-router-dom";
 import { Check, AlertCircle } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
@@ -57,9 +59,7 @@ export default function ApplyLeave() {
     }
   }
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   if (loadError) {
     return (

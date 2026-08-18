@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { AlertCircle, Check, X } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
@@ -48,9 +50,7 @@ export default function Approvals() {
     }
   }
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   const a = opened ? approvals.find((x) => x.id === opened) : null;
 
@@ -147,7 +147,12 @@ export default function Approvals() {
           <span style={{ fontFamily: FONTS.body, fontSize: 13, color: COLORS.teal }}>{note}</span>
         </div>
       )}
-      {approvals.length === 0 ? (
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <ShimmerBlock height={140} borderRadius={12} />
+          <ShimmerBlock height={140} borderRadius={12} />
+        </div>
+      ) : approvals.length === 0 ? (
         <Card style={{ textAlign: "center", color: COLORS.inkSoft, fontFamily: FONTS.body }}>
           Nothing pending. You are all caught up.
         </Card>

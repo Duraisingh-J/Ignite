@@ -1,4 +1,6 @@
-import React from "react";
+import React from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { useNavigate } from "react-router-dom";
 import { COLORS, FONTS } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
@@ -11,9 +13,7 @@ export default function EligibleLeaveTypes() {
   const navigate = useNavigate();
   const { employee, leaveTypes, loading } = useLeave();
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   return (
     <div>
@@ -23,7 +23,12 @@ export default function EligibleLeaveTypes() {
         The server returns only the active leave types configured for that region.
       </div>
 
-      {leaveTypes.length === 0 ? (
+      {loading ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+          <ShimmerBlock height={140} borderRadius={12} />
+          <ShimmerBlock height={140} borderRadius={12} />
+        </div>
+      ) : leaveTypes.length === 0 ? (
         <Card style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>
           No leave types are configured for your region yet.
         </Card>

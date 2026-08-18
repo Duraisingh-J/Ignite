@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
 import { AlertCircle, Plus, ShieldCheck, X } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import {
@@ -105,9 +106,7 @@ export default function Roles() {
     }
   }
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+
 
   const setDraftFor = (roleId, patch) =>
     setDraft({ ...draft, [roleId]: { ...(draft[roleId] ?? {}), ...patch } });
@@ -156,7 +155,7 @@ export default function Roles() {
 
       <SectionLabel eyebrow={`${roles.length} configured`}>Roles</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {roles.map((role) => {
+        {loading ? (<><ShimmerBlock height={140} borderRadius={12} /><ShimmerBlock height={140} borderRadius={12} /></>) : roles.map((role) => {
           const d = draft[role.id] ?? {};
           return (
             <Card key={role.id}>

@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { AlertCircle, Check, Globe } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import { createRegion, deleteRegion, fetchRegions } from "../../api/leaveApi";
@@ -131,9 +133,7 @@ export default function Regions() {
     }
   }
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   const labelFor = (wd) =>
     DAYS.filter(([d]) => wd.includes(d))

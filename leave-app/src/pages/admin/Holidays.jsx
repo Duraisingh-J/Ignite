@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+import ShimmerBlock from '../../components/ShimmerBlock';
+
 import { AlertCircle, Repeat, Sun } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
@@ -70,9 +72,7 @@ export default function AdminHolidays() {
     }
   }
 
-  if (loading) {
-    return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
-  }
+  
 
   return (
     <div>

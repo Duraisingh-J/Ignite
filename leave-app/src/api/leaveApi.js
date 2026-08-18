@@ -162,8 +162,9 @@ export async function createLeaveType(body) {
   return toUiLeaveType(await request(`/leave-types`, { method: "POST", body: JSON.stringify(body) }));
 }
 
-export async function fetchTenantHolidays(tenantId = TENANT_ID) {
-  return await request(`/holidays?tenantId=${tenantId}`);
+export async function fetchTenantHolidays(tenantId = TENANT_ID, year) {
+  const qs = year ? `&year=${year}` : "";
+  return await request(`/holidays?tenantId=${tenantId}${qs}`);
 }
 
 export async function createHoliday(body) {

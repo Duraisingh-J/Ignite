@@ -36,6 +36,11 @@ CREATE TABLE holiday_calendar (
     region_id  UUID NOT NULL REFERENCES region(id) ON DELETE CASCADE,
     date       DATE NOT NULL,
     name       TEXT NOT NULL,
+    -- ANNUAL: the month/day repeats every year (the stored year is the anchor).
+    -- NONE:   that exact date only - one-off closures, and lunar festivals
+    --         (Diwali, Eid) which follow no formula and are entered per year.
+    recurrence TEXT NOT NULL DEFAULT 'NONE'
+                 CHECK (recurrence IN ('NONE', 'ANNUAL')),
     UNIQUE (region_id, date)
 );
 

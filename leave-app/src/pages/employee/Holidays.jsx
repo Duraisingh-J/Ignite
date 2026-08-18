@@ -1,5 +1,5 @@
 import React from "react";
-import { Sun } from "lucide-react";
+import { Repeat, Sun } from "lucide-react";
 import { COLORS, FONTS } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
 import { useLeave } from "../../context/LeaveContext";
@@ -36,10 +36,18 @@ export default function Holidays() {
               <div style={{ background: COLORS.goldSoft, borderRadius: 8, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Sun size={18} color={COLORS.gold} />
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: FONTS.body, fontWeight: 600, fontSize: 14, color: COLORS.ink }}>{h.name}</div>
                 <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.inkSoft }}>{fmtDateFull(h.date)}</div>
               </div>
+              {h.recurrence === "ANNUAL" && (
+                <span
+                  title="Repeats every year"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, background: COLORS.tealSoft, color: COLORS.teal, borderRadius: 999, padding: "3px 9px", fontFamily: FONTS.body, fontSize: 11, fontWeight: 600, flexShrink: 0 }}
+                >
+                  <Repeat size={11} /> Yearly
+                </span>
+              )}
             </div>
           ))
         )}

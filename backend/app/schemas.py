@@ -45,6 +45,19 @@ class CamelModel(BaseModel):
     )
 
 
+class Recurrence(str, Enum):
+    """How a holiday repeats.
+
+    NONE   - that exact date only. Use for one-off closures and for lunar or
+             otherwise variable festivals (Diwali, Eid), which follow no
+             formula and must be entered per year.
+    ANNUAL - the same month/day every year; the stored date is just the anchor.
+    """
+
+    NONE = "NONE"
+    ANNUAL = "ANNUAL"
+
+
 class LeaveStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
@@ -118,6 +131,7 @@ class HolidayOut(CamelModel):
     region_id: UUID
     date: date
     name: str
+    recurrence: Recurrence = Recurrence.NONE
 
 
 class HolidayCreate(CamelIn):
@@ -125,6 +139,9 @@ class HolidayCreate(CamelIn):
     region_id: UUID
     date: date
     name: str = Field(min_length=1, max_length=120)
+    # Defaults to repeating: most entries on a holiday calendar are fixed-date
+    # national holidays. Set NONE for one-off or lunar dates.
+    recurrence: Recurrence = Recurrence.ANNUAL
 
 
 # ============================ LeaveType ============================

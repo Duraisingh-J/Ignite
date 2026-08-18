@@ -53,10 +53,16 @@ async def get_employee(employee_id: UUID):
 
 
 @router.get("/{employee_id}/holidays", response_model=DataResponse[list[HolidayOut]])
-async def list_holidays(employee_id: UUID):
-    """Holiday calendar for this employee's region."""
+async def list_holidays(
+    employee_id: UUID,
+    year: int | None = Query(None, ge=1970, le=2200),
+):
+    """Holiday calendar for this employee's region.
+
+    Defaults to the current year so ANNUAL rules resolve to real dates.
+    """
     employee = await employee_service.get_by_id(employee_id)
-    rows = await holiday_service.get_by_region(employee["region_id"])
+    rows = await holiday_service.get_by_region(employee["region_id"], year or date.today().year)
     return {"data": [HolidayOut.model_validate(r, from_attributes=True) for r in rows]}
 
 

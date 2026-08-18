@@ -17,16 +17,16 @@ INSERT INTO region (id, tenant_id, code, country_name) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- Holidays (region-scoped)
-INSERT INTO holiday_calendar (id, tenant_id, region_id, date, name) VALUES
+INSERT INTO holiday_calendar (id, tenant_id, region_id, date, name, recurrence) VALUES
   ('55555555-5555-5555-5555-555555555501',
    '11111111-1111-1111-1111-111111111111',
-   '22222222-2222-2222-2222-222222222222', '2026-08-15', 'Independence Day'),
+   '22222222-2222-2222-2222-222222222222', '2026-08-15', 'Independence Day', 'ANNUAL'),
   ('55555555-5555-5555-5555-555555555502',
    '11111111-1111-1111-1111-111111111111',
-   '22222222-2222-2222-2222-222222222222', '2026-08-27', 'Regional Holiday'),
+   '22222222-2222-2222-2222-222222222222', '2026-08-27', 'Regional Holiday', 'NONE'),
   ('55555555-5555-5555-5555-555555555503',
    '11111111-1111-1111-1111-111111111111',
-   '22222222-2222-2222-2222-222222222222', '2026-10-02', 'Gandhi Jayanti')
+   '22222222-2222-2222-2222-222222222222', '2026-10-02', 'Gandhi Jayanti', 'ANNUAL')
 ON CONFLICT (region_id, date) DO NOTHING;
 
 -- Manager (Priya) and Employee (Ravi)

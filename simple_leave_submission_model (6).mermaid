@@ -1,0 +1,79 @@
+classDiagram
+    %% ==================== SIMPLE ONBOARDING -> SUBMISSION MODEL ====================
+    %% New employee has zero history. They just need to see a leave type
+    %% dropdown, submit a request, and have it show up for the admin/manager.
+
+    class Tenant {
+        +UUID id
+        +String orgName
+    }
+
+    class Region {
+        +UUID id
+        +UUID tenantId
+        +String code
+        +String countryName
+    }
+
+    class HolidayCalendar {
+        +UUID id
+        +UUID tenantId
+        +UUID regionId
+        +Date date
+        +String name
+    }
+
+    class Employee {
+        +UUID id
+        +UUID tenantId
+        +UUID managerId
+        +UUID regionId
+        +String name
+        +String email
+        +Date joinDate
+    }
+
+    class LeaveType {
+        +UUID id
+        +UUID regionId
+        +String name
+        +Boolean isPaid
+        +Boolean isActive
+        +Boolean requiresApproval
+        +getDropdownOptions(regionId) List~LeaveType~
+    }
+
+    class LeaveRequest {
+        +UUID id
+        +UUID tenantId
+        +UUID employeeId
+        +UUID leaveTypeId
+        +Date startDate
+        +Date endDate
+        +String status
+        +String reason
+        +DateTime submittedAt
+        +submit() void
+    }
+
+    class AdminDashboard {
+        +getPendingRequests(tenantId) List~LeaveRequest~
+        +getRequestsByEmployee(employeeId) List~LeaveRequest~
+    }
+
+    %% ==================== RELATIONSHIPS ====================
+    Tenant "1" --> "*" Employee : owns
+    Tenant "1" --> "*" LeaveRequest : owns
+    Tenant "1" --> "*" Region : defines
+
+    Employee "*" --> "1" Region : located_in
+    Employee "1" --> "*" LeaveRequest : submits
+    LeaveRequest "*" --> "1" LeaveType : selected_from_dropdown
+    LeaveType ..> LeaveRequest : populates_region_scoped_dropdown
+
+    Region "1" --> "*" HolidayCalendar : defines
+    Region "1" --> "*" LeaveType : scoped_to
+    LeaveRequest ..> HolidayCalendar : excludes_dates_via_region
+
+    LeaveRequest ..> AdminDashboard : reflected_on_submit
+    AdminDashboard ..> Tenant : scoped_to

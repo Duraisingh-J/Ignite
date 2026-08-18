@@ -1,4 +1,31 @@
-leave*
+# ---- secrets ----
+# Never commit real credentials. .env.example files are committed as templates.
+.env
+.env.*
+!.env.example
+
+# ---- python ----
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ---- node ----
+node_modules/
+dist/
+npm-debug.log*
+yarn-error.log*
+
+# ---- editors / os ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- local scratch ----
+# Carried over from the initial commit. NOTE: the original also had `leave*`
+# and `simple*`, which would have excluded leave-app/ and the domain model
+# file — both are tracked source, so those two patterns were dropped.
 object*
-simple*
 uk*

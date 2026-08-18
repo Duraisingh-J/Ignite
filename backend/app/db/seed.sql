@@ -1,0 +1,54 @@
+-- =============================================================
+-- Seed data (mirrors the sample UI: tenant "Meridian", India region,
+-- employee Ravi, three leave types, three 2026 holidays).
+-- Fixed UUIDs so the frontend can point at Ravi without a login flow.
+-- Idempotent via ON CONFLICT.
+-- =============================================================
+
+-- Tenant
+INSERT INTO tenant (id, org_name) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'Meridian')
+ON CONFLICT (id) DO NOTHING;
+
+-- Region
+INSERT INTO region (id, tenant_id, code, country_name) VALUES
+  ('22222222-2222-2222-2222-222222222222',
+   '11111111-1111-1111-1111-111111111111', 'IN', 'India')
+ON CONFLICT (id) DO NOTHING;
+
+-- Holidays (region-scoped)
+INSERT INTO holiday_calendar (id, tenant_id, region_id, date, name) VALUES
+  ('55555555-5555-5555-5555-555555555501',
+   '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222222', '2026-08-15', 'Independence Day'),
+  ('55555555-5555-5555-5555-555555555502',
+   '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222222', '2026-08-27', 'Regional Holiday'),
+  ('55555555-5555-5555-5555-555555555503',
+   '11111111-1111-1111-1111-111111111111',
+   '22222222-2222-2222-2222-222222222222', '2026-10-02', 'Gandhi Jayanti')
+ON CONFLICT (region_id, date) DO NOTHING;
+
+-- Manager (Priya) and Employee (Ravi)
+INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_date) VALUES
+  ('33333333-3333-3333-3333-333333333334',
+   '11111111-1111-1111-1111-111111111111', NULL,
+   '22222222-2222-2222-2222-222222222222', 'Priya', 'priya@meridian.io', '2022-06-01')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_date) VALUES
+  ('33333333-3333-3333-3333-333333333333',
+   '11111111-1111-1111-1111-111111111111',
+   '33333333-3333-3333-3333-333333333334',
+   '22222222-2222-2222-2222-222222222222', 'Ravi', 'ravi@meridian.io', '2025-03-10')
+ON CONFLICT (id) DO NOTHING;
+
+-- Leave types (region-scoped)
+INSERT INTO leave_type (id, region_id, name, is_paid, is_active, requires_approval) VALUES
+  ('44444444-4444-4444-4444-444444444401',
+   '22222222-2222-2222-2222-222222222222', 'Annual Leave', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444402',
+   '22222222-2222-2222-2222-222222222222', 'Sick Leave', TRUE, TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444403',
+   '22222222-2222-2222-2222-222222222222', 'Casual Leave', TRUE, TRUE, TRUE)
+ON CONFLICT (region_id, name) DO NOTHING;

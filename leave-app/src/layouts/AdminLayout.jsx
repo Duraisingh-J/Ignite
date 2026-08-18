@@ -19,7 +19,8 @@ export default function AdminLayout() {
     <div style={{ display: "flex", minHeight: "100vh", background: COLORS.paper }}>
       <Sidebar items={NAV_ITEMS} basePath="/admin" />
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <Topbar title="Admin" avatarLetter="S" />
+        {/* Tenant-wide configuration — none of it varies by who is signed in. */}
+        <Topbar title="Admin" avatarLetter="S" hideSwitcher />
         <div style={{ padding: 32, flex: 1, overflowY: "auto" }}>
           <Outlet />
         </div>

@@ -17,7 +17,8 @@ export default function ManagerLayout() {
     <div style={{ display: "flex", minHeight: "100vh", background: COLORS.paper }}>
       <Sidebar items={NAV_ITEMS} basePath="/manager" />
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <Topbar title="Manager" avatarLetter="P" />
+        {/* Only people who actually have reports can approve anything here. */}
+        <Topbar title="Manager" avatarLetter="P" managersOnly />
         <div style={{ padding: 32, flex: 1, overflowY: "auto" }}>
           <Outlet />
         </div>

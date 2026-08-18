@@ -8,7 +8,7 @@ import { useSession } from "../context/SessionContext";
 // title: "Employee" | "Manager" | "Admin"
 // avatarLetter: single letter shown in the avatar circle
 // eligibleLink: optional { to } — shows the "Eligible Leave Types" quick link (employee only)
-export default function Topbar({ title, avatarLetter, eligibleLink }) {
+export default function Topbar({ title, avatarLetter, eligibleLink, managersOnly = false }) {
   // The avatar follows whoever you are acting as, so it cannot disagree with
   // the switcher next to it. The prop is only a fallback before people load.
   const { currentUserId, people } = useSession();
@@ -42,7 +42,7 @@ export default function Topbar({ title, avatarLetter, eligibleLink }) {
         )}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <IdentitySwitcher />
+        <IdentitySwitcher managersOnly={managersOnly} />
         <Bell size={17} color={COLORS.inkSoft} />
         <div
           style={{

@@ -3,8 +3,10 @@
 > **Problem statement:** Design a leave management engine that handles multi-tier
 > approval workflows, calendars, dynamic accrual calculations, and holidays.
 
-This repository is being built in **vertical slices**. Slice 1 — *onboarding →
-submission* — is complete and running end-to-end against PostgreSQL.
+Built in **vertical slices**, running end-to-end against PostgreSQL. Every
+screen reads and writes real data — there is no mock data in the application.
+
+📘 **[Full build documentation →](docs/BUILD.md)**  ·  🔀 **[Multi-tier approval →](docs/multi-tier-approval.md)**
 
 ---
 
@@ -12,14 +14,19 @@ submission* — is complete and running end-to-end against PostgreSQL.
 
 | Area | State |
 | --- | --- |
-| Employee leave request (apply + view own requests) | ✅ Complete, wired to PostgreSQL |
-| Region-scoped leave types & holiday calendar | ✅ Complete |
-| Working-day engine (weekends + region holidays) | ✅ Complete |
-| Multi-tier approval workflow | ⛔ Not started — out of scope for slice 1 |
-| Balances / accrual engine | ⛔ Not started — no balance concept in the v1 model |
-| Manager & Admin screens | 🟡 UI exists on mock data; no endpoints yet |
+| Employee leave request (apply + view own requests) | ✅ Live |
+| Region-scoped leave types & holiday calendars | ✅ Live |
+| Working-day engine (per-region working week + holidays) | ✅ Live |
+| Recurring holidays (repeat every year) | ✅ Live |
+| Multi-region (India, US, UK, UAE) | ✅ Live |
+| Manager assignment & reassignment | ✅ Live |
+| **Multi-tier approval workflow** | ✅ Live |
+| Manager & Admin consoles | ✅ Live |
+| Balances / accrual engine | ⛔ Not built — no balance concept in the schema |
+| Authentication | ⛔ Not built — the API trusts the id it is given |
 
-**Live demo path:** browser → Vite proxy → FastAPI → PostgreSQL → back into *My Requests*.
+**22 API endpoints · 7 tables.** Live path: browser → Vite proxy → FastAPI →
+PostgreSQL → back into the UI.
 
 ---
 
@@ -230,12 +237,11 @@ painful to diagnose later:
 
 ## Roadmap
 
-**Slice 2 — approvals.** `PATCH /api/v1/leave-requests/{id}` plus a
-`leave_request_approval` table; wire `decideApproval` in `LeaveContext`. Resolve
-the approval chain at submit time and *freeze* it onto the request so a mid-flight
-org-chart change cannot alter a request already in review.
+**Done since:** multi-tier approval (chains frozen at submit — see
+[docs/multi-tier-approval.md](docs/multi-tier-approval.md)), recurring holidays,
+multi-region with per-region working weeks, and manager assignment.
 
-**Slice 3 — balances & accrual.** The recommended design is an **append-only
+**Next — balances & accrual.** The recommended design is an **append-only
 ledger** rather than a mutable `balance` column: every mutation is an entry
 (`ACCRUAL`, `CARRYOVER`, `DEDUCTION`, `ADJUSTMENT`, `EXPIRY`), and a balance is
 the sum of entries up to a date. That yields an audit trail, retroactive
@@ -243,6 +249,11 @@ correction, and point-in-time balances for free. Accrual policy should be stored
 **as data** (rate, cadence, proration, caps, carryover expiry) so administrators
 can change rules without a deploy — that is what makes accrual "dynamic".
 
-**Also needed before production:** authentication (the UI currently reads a demo
-employee id from `.env`), a per-region work-week (Gulf states run Sun–Thu; the
-engine currently hardcodes Sat/Sun), and half-day support.
+**Then — snapshot the day breakdown onto `leave_request`.** `workingDays` is
+currently recomputed on every read, so each consumer must independently get the
+rules right; three separate bugs came from exactly that. It also means editing a
+holiday calendar retroactively changes the day count of already-approved
+requests. One column plus a JSONB fixes both.
+
+**Blocker before production:** authentication. The API trusts whatever employee
+id it is given, so any caller can act as anyone.

@@ -8,6 +8,7 @@ from app.repositories import (
     leave_request_repository,
     leave_type_repository,
 )
+from app.services.holiday_expansion import expand
 from app.services.working_days import DayBreakdown, calc_working_days
 
 # Only these transitions are legal. PENDING is the only decidable state, and
@@ -20,8 +21,15 @@ _ALLOWED_TRANSITIONS = {
 }
 
 
-def _breakdown_for(row: dict, holiday_dates: set[date]) -> DayBreakdown:
-    return calc_working_days(row["start_date"], row["end_date"], holiday_dates)
+def _breakdown_for(row: dict, holiday_rows: list[dict]) -> DayBreakdown:
+    """Recompute a stored request's day count.
+
+    Recurring rules must be expanded against *this request's* range, not the
+    current year — otherwise a 2029 request never sees a holiday anchored in
+    2026, and the read disagrees with what submit() calculated.
+    """
+    holidays = expand(holiday_rows, row["start_date"], row["end_date"])
+    return calc_working_days(row["start_date"], row["end_date"], holidays)
 
 
 def _to_dto(row: dict, breakdown: DayBreakdown) -> dict:
@@ -57,9 +65,9 @@ def _to_approval_dto(row: dict, breakdown: DayBreakdown) -> dict:
     }
 
 
-async def _holidays_for_region(region_id: UUID) -> set[date]:
-    rows = await holiday_repository.find_by_region(region_id)
-    return {r["date"] for r in rows}
+async def _holiday_rows_for_region(region_id: UUID) -> list[dict]:
+    """Raw rows (with recurrence), fetched once and expanded per request."""
+    return await holiday_repository.find_by_region(region_id)
 
 
 # ============================ submit ============================
@@ -122,8 +130,8 @@ async def get_by_employee(employee_id: UUID) -> list[dict]:
     rows = await leave_request_repository.find_by_employee(employee_id)
     if not rows:
         return []
-    holidays = await _holidays_for_region(employee["region_id"])
-    return [_to_dto(r, _breakdown_for(r, holidays)) for r in rows]
+    holiday_rows = await _holiday_rows_for_region(employee["region_id"])
+    return [_to_dto(r, _breakdown_for(r, holiday_rows)) for r in rows]
 
 
 async def get_for_manager(manager_id: UUID, status: str | None) -> list[dict]:
@@ -137,13 +145,13 @@ async def get_for_manager(manager_id: UUID, status: str | None) -> list[dict]:
         return []
     # Reports share the manager's tenant but could differ by region, so cache
     # holiday sets per region rather than assuming one.
-    cache: dict[UUID, set[date]] = {}
+    cache: dict[UUID, list[dict]] = {}
     out = []
     for r in rows:
         emp = await employee_repository.find_by_id(r["employee_id"])
         region_id = emp["region_id"] if emp else manager["region_id"]
         if region_id not in cache:
-            cache[region_id] = await _holidays_for_region(region_id)
+            cache[region_id] = await _holiday_rows_for_region(region_id)
         out.append(_to_approval_dto(r, _breakdown_for(r, cache[region_id])))
     return out
 
@@ -156,8 +164,8 @@ async def get_team_on_leave(manager_id: UUID, on_day: date) -> list[dict]:
     rows = await leave_request_repository.find_on_leave(manager_id, on_day)
     if not rows:
         return []
-    holidays = await _holidays_for_region(manager["region_id"])
-    return [_to_approval_dto(r, _breakdown_for(r, holidays)) for r in rows]
+    holiday_rows = await _holiday_rows_for_region(manager["region_id"])
+    return [_to_approval_dto(r, _breakdown_for(r, holiday_rows)) for r in rows]
 
 
 # ============================ decide ============================
@@ -180,5 +188,5 @@ async def decide(request_id: UUID, new_status: str) -> dict:
     assert updated is not None
 
     employee = await employee_repository.find_by_id(updated["employee_id"])
-    holidays = await _holidays_for_region(employee["region_id"]) if employee else set()
-    return _to_dto(updated, _breakdown_for(updated, holidays))
+    holiday_rows = await _holiday_rows_for_region(employee["region_id"]) if employee else []
+    return _to_dto(updated, _breakdown_for(updated, holiday_rows))

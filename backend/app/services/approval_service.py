@@ -177,6 +177,13 @@ async def decide_step(
     derived = await derive_request_status(request_id)
     await leave_request_repository.update_status(request_id, derived)
 
+    # A rejection anywhere in the chain gives the reserved days back. Approval
+    # needs no entry — the deduction taken at submit already stands.
+    if derived == "REJECTED":
+        from app.services import reservation_service
+
+        await reservation_service.release(request_id=request_id, reason="rejected")
+
     return {
         "requestId": request_id,
         "stepId": step_id,

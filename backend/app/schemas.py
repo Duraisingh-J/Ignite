@@ -8,6 +8,7 @@ Responses use camelCase aliases so the React client needs no key mapping.
 """
 
 from datetime import date, datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Generic, TypeVar
 from uuid import UUID
@@ -366,6 +367,43 @@ class ApprovalOut(CamelModel):
     step_id: UUID | None = None
     step_order: int | None = None
     total_steps: int | None = None
+
+
+# ============================ Accrual / balances ============================
+class BalanceOut(CamelModel):
+    """Balance for one leave type, plus what produced it."""
+
+    leave_type_id: UUID
+    leave_type_name: str
+    # Exact value from the ledger, and the figure a UI should show. They differ
+    # because a 1.25/month rate rounded per entry would grant 18 days a year
+    # instead of 15 — so rounding happens at display time only.
+    balance: Decimal
+    display_balance: Decimal
+    # What can still be booked: every entry counted, including deductions dated
+    # in the future. This is the figure the Apply Leave form must check.
+    available: Decimal
+    accrued: Decimal
+    carried_over: Decimal
+    used: Decimal
+    # Days held by requests already submitted but not finally decided. Part of
+    # the balance above, not a further subtraction.
+    reserved: Decimal
+    adjusted: Decimal
+    expired: Decimal
+    policy_name: str | None = None
+    max_balance: Decimal | None = None
+
+
+class LedgerEntryOut(CamelModel):
+    id: UUID
+    entry_type: str
+    amount: Decimal
+    effective_date: date
+    leave_type_name: str
+    source_id: UUID | None = None
+    note: str | None = None
+    created_at: datetime
 
 
 # ============================ Stats ============================

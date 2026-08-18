@@ -122,6 +122,19 @@ async def submit(
             "This range has no working days to charge — it's all weekends/holidays"
         )
 
+    # Balance check before the overlap check: "you cannot afford this" is a
+    # more useful first answer than "these dates clash".
+    from decimal import Decimal
+
+    from app.services import reservation_service
+
+    await reservation_service.check_sufficient(
+        employee=employee,
+        leave_type_id=leave_type_id,
+        chargeable_days=Decimal(breakdown.chargeable_days),
+        on=start_date,
+    )
+
     overlaps = await leave_request_repository.find_overlapping(employee_id, start_date, end_date)
     if overlaps:
         raise ApiError.conflict(
@@ -136,6 +149,17 @@ async def submit(
         start_date=start_date,
         end_date=end_date,
         reason=reason,
+    )
+
+    # Hold the days now, not on final approval. The chain can sit pending for
+    # days, and three overlapping requests would each pass an approval-time
+    # balance check independently.
+    await reservation_service.reserve(
+        employee=employee,
+        leave_type_id=leave_type_id,
+        request_id=created["id"],
+        chargeable_days=Decimal(breakdown.chargeable_days),
+        start_date=start_date,
     )
 
     # Resolve and freeze the approval chain. Imported here rather than at module
@@ -291,6 +315,9 @@ async def decide(request_id: UUID, new_status: str) -> dict:
         # steps still pending become moot.
         updated = await leave_request_repository.update_status(request_id, new_status)
         await approval_repository.skip_remaining(request_id, 0)
+        from app.services import reservation_service
+
+        await reservation_service.release(request_id=request_id, reason="cancelled")
     assert updated is not None
 
     employee = await employee_repository.find_by_id(updated["employee_id"])

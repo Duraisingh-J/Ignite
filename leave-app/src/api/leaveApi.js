@@ -152,6 +152,29 @@ export async function submitLeaveRequest(
   return toUiRequest(created);
 }
 
+// ---------- accrual policies (admin) ----------
+
+export async function fetchAccrualPolicies(tenantId = TENANT_ID) {
+  return await request(`/accrual-policies?tenantId=${tenantId}`);
+}
+
+/** Gaps and overlaps in the tenure bands — a gap means somebody accrues nothing. */
+export async function fetchCoverage(tenantId = TENANT_ID) {
+  return await request(`/accrual-policies/coverage?tenantId=${tenantId}`);
+}
+
+export async function createAccrualPolicy(body) {
+  return await request(`/accrual-policies`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function updateAccrualPolicy(id, body) {
+  return await request(`/accrual-policies/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export async function deleteAccrualPolicy(id) {
+  return await request(`/accrual-policies/${id}`, { method: "DELETE" });
+}
+
 // ---------- balances & accrual ----------
 
 /**

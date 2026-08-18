@@ -27,6 +27,7 @@ import Policies from "./pages/admin/Policies";
 import AdminHolidays from "./pages/admin/Holidays";
 import Regions from "./pages/admin/Regions";
 import Roles from "./pages/admin/Roles";
+import AccrualPolicies from "./pages/admin/AccrualPolicies";
 
 export default function App() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="policies" element={<Policies />} />
             <Route path="regions" element={<Regions />} />
             <Route path="roles" element={<Roles />} />
+            <Route path="accrual" element={<AccrualPolicies />} />
             <Route path="holidays" element={<AdminHolidays />} />
           </Route>
           </Routes>

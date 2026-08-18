@@ -369,6 +369,86 @@ class ApprovalOut(CamelModel):
     total_steps: int | None = None
 
 
+# ============================ Accrual policies ============================
+class AccrualPolicyOut(CamelModel):
+    id: UUID
+    tenant_id: UUID
+    name: str
+    region_id: UUID | None
+    region_name: str | None = None
+    leave_type_id: UUID | None
+    leave_type_name: str | None = None
+    # Bands are [from, to) — the upper bound is EXCLUSIVE, which is why "0-24"
+    # and "25+" leave month 24 uncovered.
+    tenure_from_months: int
+    tenure_to_months: int | None
+    method: str
+    rate: Decimal
+    days_worked_divisor: int | None = None
+    pay_periods_per_year: int = 24
+    waiting_period_days: int = 0
+    prorate_on_join: bool = True
+    max_balance: Decimal | None = None
+    negative_allowed_days: Decimal = Decimal(0)
+    rounding_step: Decimal = Decimal("0.5")
+    reset_basis: str = "CALENDAR"
+    carryover_max: Decimal | None = None
+    carryover_expiry_months: int | None = None
+    is_encashable: bool = False
+    priority: int = 0
+    is_active: bool = True
+
+
+class AccrualPolicyCreate(CamelIn):
+    tenant_id: UUID
+    name: str = Field(min_length=1, max_length=120)
+    region_id: UUID | None = None
+    leave_type_id: UUID | None = None
+    tenure_from_months: int = Field(default=0, ge=0, le=600)
+    tenure_to_months: int | None = Field(default=None, ge=1, le=600)
+    method: str = "MONTHLY"
+    rate: Decimal = Field(default=Decimal(0), ge=0, le=400)
+    days_worked_divisor: int | None = Field(default=None, ge=1, le=365)
+    pay_periods_per_year: int = Field(default=24, ge=1, le=366)
+    waiting_period_days: int = Field(default=0, ge=0, le=1095)
+    prorate_on_join: bool = True
+    max_balance: Decimal | None = Field(default=None, ge=0, le=999)
+    negative_allowed_days: Decimal = Field(default=Decimal(0), ge=0, le=99)
+    rounding_step: Decimal = Field(default=Decimal("0.5"), ge=0, le=1)
+    reset_basis: str = "CALENDAR"
+    carryover_max: Decimal | None = Field(default=None, ge=0, le=999)
+    carryover_expiry_months: int | None = Field(default=None, ge=1, le=60)
+    is_encashable: bool = False
+    priority: int = Field(default=0, ge=0, le=100)
+
+
+class AccrualPolicyUpdate(CamelIn):
+    """Partial update — only the fields sent are changed."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    tenure_from_months: int | None = Field(default=None, ge=0, le=600)
+    tenure_to_months: int | None = Field(default=None, ge=1, le=600)
+    method: str | None = None
+    rate: Decimal | None = Field(default=None, ge=0, le=400)
+    days_worked_divisor: int | None = Field(default=None, ge=1, le=365)
+    waiting_period_days: int | None = Field(default=None, ge=0, le=1095)
+    prorate_on_join: bool | None = None
+    max_balance: Decimal | None = Field(default=None, ge=0, le=999)
+    rounding_step: Decimal | None = Field(default=None, ge=0, le=1)
+    carryover_max: Decimal | None = Field(default=None, ge=0, le=999)
+    is_encashable: bool | None = None
+    priority: int | None = Field(default=None, ge=0, le=100)
+    is_active: bool | None = None
+
+
+class CoverageIssueOut(CamelModel):
+    """A gap or overlap in a set of tenure bands."""
+
+    kind: str
+    scope: str
+    message: str
+
+
 # ============================ Accrual / balances ============================
 class BalanceOut(CamelModel):
     """Balance for one leave type, plus what produced it."""

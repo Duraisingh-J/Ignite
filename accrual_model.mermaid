@@ -1,0 +1,185 @@
+classDiagram
+    %% ==================== DYNAMIC ACCRUAL MODEL — PLANNED ====================
+    %% Companion to simple_leave_submission_model (6).mermaid, which documents
+    %% what is BUILT. Nothing here is implemented yet; see docs/ACCRUAL-SPEC.md.
+    %%
+    %% Core idea: a balance is never stored. It is a fold over an append-only
+    %% ledger, so "what was my balance in April", retroactive correction, and
+    %% "why is it 12?" are all answerable — none of which a mutable column can do.
+
+    %% -------------------- NEW --------------------
+    class LeaveLedger {
+        +UUID id
+        +UUID tenantId
+        +UUID employeeId
+        +UUID leaveTypeId
+        +EntryType entryType
+        +Decimal amount
+        +Date effectiveDate
+        +UUID sourceId
+        +String idempotencyKey
+        +String note
+        +DateTime createdAt
+    }
+
+    class AccrualPolicy {
+        +UUID id
+        +UUID tenantId
+        +UUID regionId
+        +UUID leaveTypeId
+        +Int tenureFromMonths
+        +Int tenureToMonths
+        +AccrualMethod method
+        +Decimal rate
+        +Int daysWorkedDivisor
+        +Int waitingPeriodDays
+        +Boolean prorateOnJoin
+        +Decimal maxBalance
+        +Decimal negativeAllowedDays
+        +Decimal roundingStep
+        +ResetBasis resetBasis
+        +Decimal carryoverMax
+        +Int carryoverExpiryMonths
+        +Boolean isEncashable
+        +Int priority
+        +Boolean isActive
+    }
+
+    class AccrualRunner {
+        <<service>>
+        +runAccrual(employeeId, asOf) List~LeaveLedger~
+        +selectPolicy(regionId, leaveTypeId, tenureMonths) AccrualPolicy
+        +prorateOnJoin(joinDate, period, rate) Decimal
+        +runYearEnd(employeeId, boundary) List~LeaveLedger~
+    }
+
+    class BalanceCalculator {
+        <<service>>
+        +balanceAsOf(employeeId, leaveTypeId, asOf) Decimal
+        +balanceDetail(employeeId, leaveTypeId, asOf) BalanceDetail
+    }
+
+    class BalanceDetail {
+        <<value object>>
+        +Decimal accrued
+        +Decimal carriedOver
+        +Decimal used
+        +Decimal reserved
+        +Decimal adjusted
+        +Decimal expired
+        +Decimal available
+    }
+
+    class EntryType {
+        <<enumeration>>
+        OPENING
+        ACCRUAL
+        CARRYOVER
+        DEDUCTION
+        REVERSAL
+        ADJUSTMENT
+        EXPIRY
+        ENCASHMENT
+    }
+
+    class AccrualMethod {
+        <<enumeration>>
+        MONTHLY
+        ANNUAL_GRANT
+        PER_PAY_PERIOD
+        PER_DAYS_WORKED
+    }
+
+    class ResetBasis {
+        <<enumeration>>
+        CALENDAR
+        FISCAL
+        ANNIVERSARY
+    }
+
+    %% -------------------- EXISTING (abbreviated) --------------------
+    class Tenant {
+        +UUID id
+        +String orgName
+    }
+
+    class Region {
+        +UUID id
+        +String code
+        +Int[] workDays
+    }
+
+    class Employee {
+        +UUID id
+        +UUID regionId
+        +Date joinDate
+        +tenureMonths(asOf) Int
+    }
+
+    class LeaveType {
+        +UUID id
+        +UUID regionId
+        +String name
+        +Int approvalLevels
+    }
+
+    class LeaveRequest {
+        +UUID id
+        +UUID employeeId
+        +LeaveStatus status
+        +Decimal chargeableDays
+    }
+
+    %% ==================== RELATIONSHIPS ====================
+    Tenant "1" --> "*" LeaveLedger : owns
+    Tenant "1" --> "*" AccrualPolicy : defines
+
+    Employee "1" --> "*" LeaveLedger : has_entries
+    LeaveType "1" --> "*" LeaveLedger : scoped_to
+
+    %% A DEDUCTION and its REVERSAL both point back at the request that caused
+    %% them, which is how a refusal stays visible instead of being deleted.
+    LeaveRequest "1" --> "*" LeaveLedger : sourceId
+
+    Region "1" --> "*" AccrualPolicy : scoped_to
+    LeaveType "1" --> "*" AccrualPolicy : scoped_to
+
+    AccrualRunner ..> AccrualPolicy : selects_by_region_type_tenure
+    AccrualRunner ..> Employee : reads_joinDate_and_tenure
+    AccrualRunner ..> LeaveLedger : writes_idempotently
+
+    BalanceCalculator ..> LeaveLedger : folds
+    BalanceCalculator ..> BalanceDetail : produces
+    LeaveRequest ..> BalanceCalculator : checks_available_on_submit
+
+    LeaveLedger --> EntryType : has
+    AccrualPolicy --> AccrualMethod : has
+    AccrualPolicy --> ResetBasis : has
+
+    %% ==================== NOTES ====================
+    %% IDEMPOTENCY. idempotencyKey is 'accrual:<employee>:<policy>:<period>' and
+    %% is UNIQUE. That single constraint is what makes the runner safe to replay:
+    %% run it late, twice, or backfill a year and the result is identical.
+    %% Without it a cron firing twice silently doubles everyone's leave.
+    %%
+    %% TENURE IS PER PERIOD. selectPolicy is called inside the period loop, not
+    %% once before it. An employee crossing 24 months in March accrues at the old
+    %% rate through February and the new rate from March.
+    %%
+    %% TIERS ARE ROWS. 0-24, 25-60, 61+ months are three AccrualPolicy rows for
+    %% the same region and leave type. Adding a band is a row, not a deploy —
+    %% this is what makes accrual dynamic rather than hardcoded. The UAE statute
+    %% is literally such a band (0 for 6 months, 2/month to 12, then 30/year).
+    %%
+    %% AMOUNT IS EXACT, NOT ROUNDED PER ENTRY. A rate of 1.25 rounded to 0.5
+    %% steps every month grants 18 days instead of 15. Store Decimal, round only
+    %% for display.
+    %%
+    %% RESERVATION. A request holds its days from SUBMIT, not from final
+    %% approval, because a multi-tier chain can sit pending for days and three
+    %% overlapping requests would each pass an approval-time balance check.
+    %% Release is a compensating REVERSAL row, never a delete.
+    %%
+    %% NOT MODELLED HERE. The UAE charges CALENDAR days and the UK's entitlement
+    %% INCLUDES public holidays; both are consumption-side mismatches with the
+    %% working-day engine rather than accrual problems. See the spec.

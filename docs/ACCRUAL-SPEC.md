@@ -139,6 +139,81 @@ region + leave_type + tenure   >   region + leave_type
 
 ---
 
+### 3.4 Model diagram
+
+Full class diagram: [`accrual_model.mermaid`](../accrual_model.mermaid).
+
+---
+
+## 3.5 How accrual reaches the ledger
+
+```mermaid
+flowchart TD
+    START([Runner invoked for employee, asOf]) --> TENURE
+    TENURE[Enumerate every period from<br/>joinDate + waitingPeriod to asOf] --> LOOP
+
+    LOOP{More periods?} -->|no| DONE([Done])
+    LOOP -->|yes| SELECT
+
+    SELECT[Select policy for<br/>region + leaveType + tenure<br/>AT THIS PERIOD]
+    SELECT --> KEY[Build idempotency key<br/>accrual:employee:policy:period]
+
+    KEY --> EXISTS{Key already<br/>in ledger?}
+    EXISTS -->|yes| LOOP
+    EXISTS -->|no| CAP
+
+    CAP{Balance already<br/>at maxBalance?}
+    CAP -->|yes| LOOP
+    CAP -->|no| PRORATE
+
+    PRORATE{First period<br/>and joined mid-way?}
+    PRORATE -->|yes| PART[amount = rate x daysPresent / daysInPeriod]
+    PRORATE -->|no| FULL[amount = rate]
+
+    PART --> WRITE
+    FULL --> WRITE
+    WRITE[INSERT ACCRUAL row<br/>exact Decimal, not rounded] --> LOOP
+```
+
+Two branches carry the design's weight. **`SELECT` sits inside the loop** — resolve
+the policy once outside it and an employee crossing a tenure band keeps the old
+rate forever. And **the idempotency check precedes everything**, which is what
+makes a replay, a retry, or a manual re-run harmless.
+
+## 3.6 Reservation lifecycle
+
+A request holds its days from submit, because a multi-tier chain can sit pending
+for days.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Submitted
+
+    Submitted --> Reserved : DEDUCTION -N<br/>sourceId = request
+    note right of Reserved
+        Balance drops NOW, not on approval.
+        Otherwise three overlapping requests
+        each pass the balance check alone.
+    end note
+
+    Reserved --> Confirmed : all tiers approved<br/>(no new entry — the<br/>deduction already stands)
+    Reserved --> Released : rejected at any tier
+    Reserved --> Released : cancelled by employee
+    Confirmed --> Released : approved then cancelled
+
+    Released : REVERSAL +N
+    note right of Released
+        A compensating row, never a delete.
+        Deleting would erase the fact that
+        leave was requested and refused.
+    end note
+
+    Confirmed --> [*]
+    Released --> [*]
+```
+
+---
+
 ## 4. The engine
 
 ### 4.1 Balance

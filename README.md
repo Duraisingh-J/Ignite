@@ -6,7 +6,7 @@
 Built in **vertical slices**, running end-to-end against PostgreSQL. Every
 screen reads and writes real data — there is no mock data in the application.
 
-📘 **[Full build documentation →](docs/BUILD.md)**  ·  🔀 **[Multi-tier approval →](docs/multi-tier-approval.md)**
+📘 **[Full build documentation →](docs/BUILD.md)**  ·  🔀 **[Multi-tier approval →](docs/multi-tier-approval.md)**  ·  📐 **[Accrual spec (planned) →](docs/ACCRUAL-SPEC.md)**
 
 ---
 

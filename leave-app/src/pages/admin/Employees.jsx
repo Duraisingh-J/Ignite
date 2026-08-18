@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Check } from "lucide-react";
 import { COLORS, FONTS, inputStyle } from "../../theme/colors";
 import { fmtDateFull } from "../../utils/dateHelpers";
-import { createEmployee, fetchAllEmployees, fetchRegions } from "../../api/leaveApi";
+import {
+  createEmployee,
+  fetchAllEmployees,
+  fetchRegions,
+  updateEmployee,
+} from "../../api/leaveApi";
 import { TENANT_ID } from "../../api/client";
 import Card from "../../components/Card";
 import Button from "../../components/Button";
@@ -10,21 +15,35 @@ import SectionLabel from "../../components/SectionLabel";
 import FieldLabel from "../../components/FieldLabel";
 
 const PAGE_SIZE = 25;
+// Large enough to list every colleague in the manager pickers without paging.
+const ALL = 200;
 
 export default function Employees() {
   const [rows, setRows] = useState([]);
   const [meta, setMeta] = useState({ total: 0, limit: PAGE_SIZE, offset: 0 });
+  const [everyone, setEveryone] = useState([]);
   const [regions, setRegions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [created, setCreated] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", regionId: "", joinDate: "" });
+  const [savingId, setSavingId] = useState(null);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    regionId: "",
+    managerId: "",
+    joinDate: "",
+  });
 
   const load = useCallback(async (offset = 0) => {
-    const res = await fetchAllEmployees(TENANT_ID, { limit: PAGE_SIZE, offset });
-    setRows(res.rows);
-    setMeta(res.meta);
+    const [page, all] = await Promise.all([
+      fetchAllEmployees(TENANT_ID, { limit: PAGE_SIZE, offset }),
+      fetchAllEmployees(TENANT_ID, { limit: ALL, offset: 0 }),
+    ]);
+    setRows(page.rows);
+    setMeta(page.meta);
+    setEveryone(all.rows);
   }, []);
 
   useEffect(() => {
@@ -52,18 +71,37 @@ export default function Employees() {
       const emp = await createEmployee({
         tenantId: TENANT_ID,
         regionId: form.regionId,
+        // Omit rather than send null when nobody is picked.
+        ...(form.managerId ? { managerId: form.managerId } : {}),
         name: form.name.trim(),
         email: form.email.trim(),
         joinDate: form.joinDate,
       });
       setCreated(emp);
-      setForm({ name: "", email: "", regionId: regions[0]?.id ?? "", joinDate: "" });
-      await load(0);
+      setForm({ ...form, name: "", email: "", managerId: "", joinDate: "" });
+      await load(meta.offset);
     } catch (e) {
-      // Duplicate email comes back as 409 from the server.
       setError(e.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Inline reassign from the table. "" means detach.
+  async function handleReassign(employeeId, managerId) {
+    setError("");
+    setSavingId(employeeId);
+    try {
+      await updateEmployee(
+        employeeId,
+        managerId ? { managerId } : { clearManager: true }
+      );
+      await load(meta.offset);
+    } catch (e) {
+      // Self-reference and reporting cycles are rejected by the server.
+      setError(e.message);
+    } finally {
+      setSavingId(null);
     }
   }
 
@@ -71,15 +109,27 @@ export default function Employees() {
     return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
   }
 
+  const th = {
+    textAlign: "left",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: COLORS.inkSoft,
+    padding: "10px 16px",
+    whiteSpace: "nowrap",
+  };
+
   return (
     <div>
       <SectionLabel eyebrow="New hire">Add employee</SectionLabel>
-      <Card style={{ maxWidth: 440, marginBottom: 32 }}>
+      <Card style={{ maxWidth: 460, marginBottom: 32 }}>
         {created && (
           <div style={{ display: "flex", gap: 8, alignItems: "center", background: COLORS.tealSoft, borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>
             <Check size={15} color={COLORS.teal} strokeWidth={3} />
             <span style={{ fontFamily: FONTS.body, fontSize: 13, color: COLORS.teal }}>
               Created {created.name}
+              {created.managerName ? ` — reports to ${created.managerName}` : ""}
             </span>
           </div>
         )}
@@ -98,6 +148,21 @@ export default function Employees() {
               <option key={r.id} value={r.id}>{r.countryName}</option>
             ))}
           </select>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <FieldLabel>Manager</FieldLabel>
+          <select value={form.managerId} onChange={(e) => setForm({ ...form, managerId: e.target.value })} style={inputStyle}>
+            <option value="">— No manager —</option>
+            {everyone.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} · {m.regionCountry}
+              </option>
+            ))}
+          </select>
+          <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.inkSoft, marginTop: 6 }}>
+            Managers may sit in any region. Leave is always calculated using the
+            employee's own region calendar and working week.
+          </div>
         </div>
         <div style={{ marginBottom: 16 }}>
           <FieldLabel>Join date</FieldLabel>
@@ -120,11 +185,11 @@ export default function Employees() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONTS.body }}>
             <thead>
               <tr style={{ background: COLORS.paperDim }}>
-                {["Name", "Email", "Region", "Manager", "Joined"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: COLORS.inkSoft, padding: "10px 16px", whiteSpace: "nowrap" }}>
-                    {h}
-                  </th>
-                ))}
+                <th style={th}>Name</th>
+                <th style={th}>Email</th>
+                <th style={th}>Region</th>
+                <th style={th}>Reports to</th>
+                <th style={th}>Joined</th>
               </tr>
             </thead>
             <tbody>
@@ -133,7 +198,22 @@ export default function Employees() {
                   <td style={{ padding: "12px 16px", fontSize: 14, color: COLORS.ink, fontWeight: 500, whiteSpace: "nowrap" }}>{e.name}</td>
                   <td style={{ padding: "12px 16px", fontSize: 13, color: COLORS.inkSoft }}>{e.email}</td>
                   <td style={{ padding: "12px 16px", fontSize: 13, color: COLORS.inkSoft }}>{e.regionCountry}</td>
-                  <td style={{ padding: "12px 16px", fontSize: 13, color: COLORS.inkSoft }}>{e.managerName || "—"}</td>
+                  <td style={{ padding: "8px 16px" }}>
+                    {/* Inline reassign — the server rejects cycles and self-reference. */}
+                    <select
+                      value={e.managerId ?? ""}
+                      disabled={savingId === e.id}
+                      onChange={(ev) => handleReassign(e.id, ev.target.value)}
+                      style={{ ...inputStyle, fontSize: 13, padding: "6px 8px", minWidth: 170 }}
+                    >
+                      <option value="">— No manager —</option>
+                      {everyone
+                        .filter((m) => m.id !== e.id)
+                        .map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                  </td>
                   <td style={{ padding: "12px 16px", fontSize: 13, fontFamily: FONTS.mono, color: COLORS.inkSoft, whiteSpace: "nowrap" }}>{fmtDateFull(e.joinDate)}</td>
                 </tr>
               ))}

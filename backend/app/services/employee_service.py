@@ -48,6 +48,7 @@ async def create(
             raise ApiError.bad_request("Unknown managerId")
         if manager["tenant_id"] != tenant_id:
             raise ApiError.bad_request("managerId belongs to a different tenant")
+        # A brand-new employee has no reports yet, so no cycle is possible here.
 
     if await employee_repository.find_by_email(email):
         raise ApiError.conflict("An employee with that email already exists")
@@ -60,3 +61,61 @@ async def create(
         email=email,
         join_date=join_date,
     )
+
+
+async def _assert_manager_assignable(employee_id: UUID, manager_id: UUID, tenant_id: UUID) -> dict:
+    """Guards every real HR system needs before writing a reporting line."""
+    if manager_id == employee_id:
+        raise ApiError.bad_request("An employee cannot be their own manager")
+
+    manager = await employee_repository.find_by_id(manager_id)
+    if manager is None:
+        raise ApiError.bad_request("Unknown managerId")
+    if manager["tenant_id"] != tenant_id:
+        raise ApiError.bad_request("managerId belongs to a different tenant")
+
+    # Cross-region reporting lines are allowed by design; leave is still
+    # calculated with the *employee's* region calendar and work week.
+
+    # Walking up from the proposed manager must never reach the employee,
+    # or the two would report to each other and the chain would loop.
+    chain = await employee_repository.management_chain(manager_id)
+    if employee_id in chain:
+        raise ApiError.conflict(
+            "That would create a reporting cycle",
+            {"reason": f"{manager['name']} already reports to this employee, directly or indirectly"},
+        )
+    return manager
+
+
+async def update(
+    employee_id: UUID,
+    *,
+    manager_id: UUID | None = None,
+    clear_manager: bool = False,
+    region_id: UUID | None = None,
+    name: str | None = None,
+) -> dict:
+    employee = await employee_repository.find_by_id(employee_id)
+    if employee is None:
+        raise ApiError.not_found("Employee not found")
+
+    if manager_id is not None and not clear_manager:
+        await _assert_manager_assignable(employee_id, manager_id, employee["tenant_id"])
+
+    if region_id is not None:
+        region = await region_repository.find_by_id(region_id)
+        if region is None:
+            raise ApiError.bad_request("Unknown regionId")
+        if region["tenant_id"] != employee["tenant_id"]:
+            raise ApiError.bad_request("regionId does not belong to that tenant")
+
+    updated = await employee_repository.update(
+        employee_id,
+        manager_id=manager_id,
+        clear_manager=clear_manager,
+        region_id=region_id,
+        name=name,
+    )
+    assert updated is not None
+    return updated

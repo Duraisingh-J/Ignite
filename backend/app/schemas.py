@@ -123,7 +123,11 @@ class EmployeeSummaryOut(CamelModel):
     name: str
     email: str
     join_date: date
+    region_id: UUID
     region_country: str
+    # Both the id and the name: the id binds the reassign dropdown reliably
+    # (two colleagues can share a name), the name renders without a lookup.
+    manager_id: UUID | None
     manager_name: str | None
 
 
@@ -152,6 +156,16 @@ class EmployeeCreate(CamelIn):
         if self.manager_id is not None and self.manager_id == self.region_id:
             raise ValueError("managerId looks like a regionId")
         return self
+
+
+class EmployeeUpdate(CamelIn):
+    """Partial update. Send managerId: null to detach an employee from their
+    manager; omit the field entirely to leave the reporting line unchanged."""
+
+    manager_id: UUID | None = None
+    clear_manager: bool = False
+    region_id: UUID | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=120)
 
 
 # ============================ Holiday ============================

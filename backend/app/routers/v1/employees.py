@@ -8,6 +8,7 @@ from app.schemas import (
     EmployeeCreate,
     EmployeeOut,
     EmployeeSummaryOut,
+    EmployeeUpdate,
     HolidayOut,
     PagedResponse,
     PageMeta,
@@ -43,6 +44,19 @@ async def create_employee(payload: EmployeeCreate):
         join_date=payload.join_date,
     )
     return {"data": EmployeeOut.model_validate(created, from_attributes=True)}
+
+
+@router.patch("/{employee_id}", response_model=DataResponse[EmployeeOut])
+async def update_employee(employee_id: UUID, payload: EmployeeUpdate):
+    """Reassign an employee's manager, region or name."""
+    updated = await employee_service.update(
+        employee_id,
+        manager_id=payload.manager_id,
+        clear_manager=payload.clear_manager,
+        region_id=payload.region_id,
+        name=payload.name.strip() if payload.name else None,
+    )
+    return {"data": EmployeeOut.model_validate(updated, from_attributes=True)}
 
 
 @router.get("/{employee_id}", response_model=DataResponse[EmployeeOut])

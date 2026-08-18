@@ -1,7 +1,13 @@
 classDiagram
-    %% ==================== SIMPLE ONBOARDING -> SUBMISSION MODEL ====================
-    %% New employee has zero history. They just need to see a leave type
-    %% dropdown, submit a request, and have it show up for the admin/manager.
+    %% ==================== ONBOARDING -> SUBMISSION -> APPROVAL MODEL ====================
+    %% Kept in step with backend/app/db/schema.sql. Update both together.
+    %%
+    %% Scope now covered: an employee sees a region-scoped leave type dropdown,
+    %% submits a request, and their manager approves or rejects it. Weekends and
+    %% region holidays are excluded from the chargeable day count.
+    %%
+    %% Still out of scope: balances/accrual, multi-tier approval chains,
+    %% authentication, half-days.
 
     class Tenant {
         +UUID id
@@ -13,6 +19,9 @@ classDiagram
         +UUID tenantId
         +String code
         +String countryName
+        +Int[] workDays
+        +String timezone
+        +isWorkingDay(date) Boolean
     }
 
     class HolidayCalendar {
@@ -21,6 +30,8 @@ classDiagram
         +UUID regionId
         +Date date
         +String name
+        +Recurrence recurrence
+        +occurrencesInRange(start, end) List~Date~
     }
 
     class Employee {
@@ -31,6 +42,8 @@ classDiagram
         +String name
         +String email
         +Date joinDate
+        +getTeam(managerId, onDate) List~Employee~
+        +reassignManager(managerId) void
     }
 
     class LeaveType {
@@ -50,30 +63,87 @@ classDiagram
         +UUID leaveTypeId
         +Date startDate
         +Date endDate
-        +String status
+        +LeaveStatus status
         +String reason
         +DateTime submittedAt
         +submit() void
+        +decide(status) void
+    }
+
+    class DayBreakdown {
+        <<value object>>
+        +Int calendarDays
+        +Int weekendDays
+        +Int holidayDays
+        +Int chargeableDays
+        +List~Date~ excludedDates
+    }
+
+    class WorkingDayCalculator {
+        <<service>>
+        +calcWorkingDays(start, end, holidays, workDays) DayBreakdown
+    }
+
+    class LeaveStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+        CANCELLED
+    }
+
+    class Recurrence {
+        <<enumeration>>
+        NONE
+        ANNUAL
     }
 
     class AdminDashboard {
+        <<service>>
         +getPendingRequests(tenantId) List~LeaveRequest~
         +getRequestsByEmployee(employeeId) List~LeaveRequest~
+        +getApprovalsForManager(managerId) List~LeaveRequest~
+        +getTenantStats(tenantId) Stats
     }
 
     %% ==================== RELATIONSHIPS ====================
     Tenant "1" --> "*" Employee : owns
     Tenant "1" --> "*" LeaveRequest : owns
     Tenant "1" --> "*" Region : defines
+    Tenant "1" --> "*" HolidayCalendar : owns
 
     Employee "*" --> "1" Region : located_in
     Employee "1" --> "*" LeaveRequest : submits
-    LeaveRequest "*" --> "1" LeaveType : selected_from_dropdown
-    LeaveType ..> LeaveRequest : populates_region_scoped_dropdown
+    Employee "*" --> "0..1" Employee : reports_to
 
     Region "1" --> "*" HolidayCalendar : defines
     Region "1" --> "*" LeaveType : scoped_to
+    LeaveRequest "*" --> "1" LeaveType : selected_from_dropdown
+    LeaveType ..> LeaveRequest : populates_region_scoped_dropdown
+
     LeaveRequest ..> HolidayCalendar : excludes_dates_via_region
+    LeaveRequest ..> WorkingDayCalculator : computes_day_count
+    WorkingDayCalculator ..> Region : reads_workDays
+    WorkingDayCalculator ..> DayBreakdown : produces
+
+    LeaveRequest --> LeaveStatus : has
+    HolidayCalendar --> Recurrence : has
 
     LeaveRequest ..> AdminDashboard : reflected_on_submit
     AdminDashboard ..> Tenant : scoped_to
+
+    %% ==================== NOTES ====================
+    %% DayBreakdown is COMPUTED ON READ, not stored. LeaveRequest has no day
+    %% column, so editing a holiday calendar retroactively changes the day count
+    %% of existing requests. Snapshotting it onto LeaveRequest at submit would
+    %% fix that, and is the recommended next schema change.
+    %%
+    %% Region.workDays holds Python date.weekday() numbers (0=Mon .. 6=Sun).
+    %% Mon-Fri in most regions, Sun-Thu across much of the Gulf.
+    %%
+    %% Recurrence.ANNUAL means the month/day repeats every year and the stored
+    %% year is only an anchor. Lunar festivals (Diwali, Eid) follow no formula
+    %% and must be entered per year as NONE.
+    %%
+    %% Employee.reports_to is optional and may cross regions. Cycles and
+    %% self-reference are rejected by the service layer, not by the schema.

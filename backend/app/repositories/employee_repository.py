@@ -79,3 +79,57 @@ async def insert(
     created = await find_by_id(row["id"])
     assert created is not None
     return created
+
+
+async def update(
+    employee_id: UUID,
+    *,
+    manager_id: UUID | None = None,
+    clear_manager: bool = False,
+    region_id: UUID | None = None,
+    name: str | None = None,
+) -> dict | None:
+    """Partial update. `clear_manager` distinguishes "set to NULL" from "leave alone",
+    which a plain None argument cannot express."""
+    sets, params = [], []
+    if clear_manager:
+        sets.append("manager_id = NULL")
+    elif manager_id is not None:
+        sets.append("manager_id = %s")
+        params.append(manager_id)
+    if region_id is not None:
+        sets.append("region_id = %s")
+        params.append(region_id)
+    if name is not None:
+        sets.append("name = %s")
+        params.append(name)
+    if not sets:
+        return await find_by_id(employee_id)
+
+    params.append(employee_id)
+    await fetch_one(
+        f"UPDATE employee SET {', '.join(sets)} WHERE id = %s RETURNING id", tuple(params)
+    )
+    return await find_by_id(employee_id)
+
+
+async def management_chain(employee_id: UUID) -> list[UUID]:
+    """Ids from this employee upward to the top of the reporting line.
+
+    Uses a recursive CTE with a depth cap so a pre-existing cycle in the data
+    cannot spin forever.
+    """
+    rows = await fetch_all(
+        """
+        WITH RECURSIVE chain(id, manager_id, depth) AS (
+            SELECT id, manager_id, 0 FROM employee WHERE id = %s
+            UNION ALL
+            SELECT e.id, e.manager_id, c.depth + 1
+              FROM employee e JOIN chain c ON e.id = c.manager_id
+             WHERE c.depth < 50
+        )
+        SELECT id FROM chain
+        """,
+        (employee_id,),
+    )
+    return [r["id"] for r in rows]

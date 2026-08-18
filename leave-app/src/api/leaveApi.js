@@ -154,6 +154,11 @@ export async function createEmployee(body) {
   return await request(`/employees`, { method: "POST", body: JSON.stringify(body) });
 }
 
+/** Partial update. Pass { clearManager: true } to detach a manager. */
+export async function updateEmployee(id, body) {
+  return await request(`/employees/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
 export async function fetchAllLeaveTypes(tenantId = TENANT_ID) {
   const types = await request(`/leave-types?tenantId=${tenantId}`);
   return types.map(toUiLeaveType);

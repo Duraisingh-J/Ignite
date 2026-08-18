@@ -11,6 +11,7 @@ import {
   decideApprovalStep,
   decideLeaveRequest,
   fetchApprovals,
+  fetchBalances,
   fetchEmployee,
   fetchHolidays,
   fetchLeaveTypes,
@@ -30,6 +31,7 @@ export function LeaveProvider({ children }) {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [balances, setBalances] = useState([]);
 
   const [approvals, setApprovals] = useState([]);
   const [team, setTeam] = useState([]);
@@ -40,6 +42,18 @@ export function LeaveProvider({ children }) {
 
   const reloadRequests = useCallback(async () => {
     setRequests(await fetchMyRequests(currentUserId));
+  }, [currentUserId]);
+
+  // Balances move whenever a request is submitted, rejected or cancelled, so
+  // they are refreshed alongside the request list rather than on their own.
+  const reloadBalances = useCallback(async () => {
+    try {
+      setBalances(await fetchBalances(currentUserId));
+    } catch {
+      // A leave type with no accrual policy simply has no balance; the employee
+      // screens must still work.
+      setBalances([]);
+    }
   }, [currentUserId]);
 
   // Approver views share one refresh so a decision updates the queue, the team
@@ -77,6 +91,7 @@ export function LeaveProvider({ children }) {
         setLeaveTypes(types);
         setHolidays(hols);
         setRequests(reqs);
+        await reloadBalances();
 
         // Approver data is secondary — someone with no reports still needs the
         // employee screens to work, so a failure here must not blank them.
@@ -95,7 +110,7 @@ export function LeaveProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [currentUserId, reloadManager]);
+  }, [currentUserId, reloadManager, reloadBalances]);
 
   // Submits to the API, then refreshes. Throws on failure so the calling page
   // can surface the server's message (overlap, all-weekend range, ...).
@@ -104,7 +119,7 @@ export function LeaveProvider({ children }) {
       { leaveTypeId, startDate, endDate, reason },
       currentUserId
     );
-    await reloadRequests();
+    await Promise.all([reloadRequests(), reloadBalances()]);
     // A new request may land in someone's approval queue.
     reloadManager().catch(() => {});
     return created;
@@ -123,14 +138,14 @@ export function LeaveProvider({ children }) {
       approve,
       comment: comment || null,
     });
-    await Promise.all([reloadManager(), reloadRequests()]);
+    await Promise.all([reloadManager(), reloadRequests(), reloadBalances()]);
     return result;
   }
 
   // Employee withdrawing their own request. Bypasses the chain.
   async function cancelRequest(id) {
     const updated = await decideLeaveRequest(id, "CANCELLED");
-    await Promise.all([reloadRequests(), reloadManager().catch(() => {})]);
+    await Promise.all([reloadRequests(), reloadBalances(), reloadManager().catch(() => {})]);
     return updated;
   }
 
@@ -139,6 +154,7 @@ export function LeaveProvider({ children }) {
     leaveTypes,
     holidays,
     requests,
+    balances,
     approvals,
     team,
     onLeave,
@@ -148,6 +164,7 @@ export function LeaveProvider({ children }) {
     decideStep,
     cancelRequest,
     reloadRequests,
+    reloadBalances,
     reloadManager,
   };
 

@@ -13,6 +13,7 @@ import MyRequests from "./pages/employee/MyRequests";
 import EligibleLeaveTypes from "./pages/employee/EligibleLeaveTypes";
 import EmployeeHolidays from "./pages/employee/Holidays";
 import Profile from "./pages/employee/Profile";
+import Balance from "./pages/employee/Balance";
 
 import ManagerDashboard from "./pages/manager/Dashboard";
 import Approvals from "./pages/manager/Approvals";
@@ -40,6 +41,7 @@ export default function App() {
             <Route index element={<EmployeeDashboard />} />
             <Route path="apply" element={<ApplyLeave />} />
             <Route path="requests" element={<MyRequests />} />
+            <Route path="balance" element={<Balance />} />
             <Route path="eligible" element={<EligibleLeaveTypes />} />
             <Route path="holidays" element={<EmployeeHolidays />} />
             <Route path="profile" element={<Profile />} />

@@ -1,6 +1,6 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
-import { Home, FileText, ClipboardList, CalendarDays, User } from "lucide-react";
+import { Home, FileText, ClipboardList, CalendarDays, User, Wallet } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { COLORS } from "../theme/colors";
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: "", label: "Dashboard", icon: Home },
   { to: "apply", label: "Apply Leave", icon: FileText },
   { to: "requests", label: "My Requests", icon: ClipboardList },
+  { to: "balance", label: "Balance", icon: Wallet },
   { to: "holidays", label: "Holidays", icon: CalendarDays },
   { to: "profile", label: "Profile", icon: User },
 ];

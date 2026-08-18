@@ -152,6 +152,33 @@ export async function submitLeaveRequest(
   return toUiRequest(created);
 }
 
+// ---------- balances & accrual ----------
+
+/**
+ * Balance per leave type.
+ *
+ * Two figures come back and they differ on purpose: `balance` is what the
+ * employee holds today, `available` is what they can still book. Leave already
+ * booked for a future date is dated in the future, so it is rightly absent from
+ * today's balance but must not be spendable twice. Booking checks `available`.
+ */
+export async function fetchBalances(employeeId = EMPLOYEE_ID, asOf) {
+  const qs = asOf ? `?asOf=${asOf}` : "";
+  return await request(`/balances/${employeeId}${qs}`);
+}
+
+/** The ledger entries — the answer to "why is my balance 12?". */
+export async function fetchLedger(employeeId = EMPLOYEE_ID, leaveTypeId) {
+  const qs = leaveTypeId ? `?leaveTypeId=${leaveTypeId}` : "";
+  return await request(`/balances/${employeeId}/ledger${qs}`);
+}
+
+/** Safe to call repeatedly: entries carry a unique key per period. */
+export async function runAccrual(employeeId, asOf) {
+  const qs = asOf ? `?asOf=${asOf}` : "";
+  return await request(`/balances/${employeeId}/run-accrual${qs}`, { method: "POST" });
+}
+
 // ---------- manager ----------
 
 /** What is waiting on this person right now, across every tier of the chain. */

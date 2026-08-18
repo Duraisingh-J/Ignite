@@ -11,7 +11,7 @@ import SectionLabel from "../../components/SectionLabel";
 import FieldLabel from "../../components/FieldLabel";
 
 export default function ApplyLeave() {
-  const { employee, leaveTypes, holidays, addRequest, loading, error: loadError } = useLeave();
+  const { employee, leaveTypes, holidays, balances, addRequest, loading, error: loadError } = useLeave();
   const location = useLocation();
   const preselect = location.state?.preselect; // set when arriving from "Eligible Leave Types"
 
@@ -32,6 +32,12 @@ export default function ApplyLeave() {
     () => calcLeaveBreakdown(start, end, holidays, employee?.regionWorkDays),
     [start, end, holidays, employee]
   );
+
+  const selectedBalance = (balances ?? []).find((b) => b.leaveTypeId === typeId);
+  const afterBalance =
+    selectedBalance && breakdown
+      ? Number(selectedBalance.available) - breakdown.chargeable
+      : null;
 
   async function handleSubmit() {
     setError("");
@@ -123,6 +129,16 @@ export default function ApplyLeave() {
             <option key={lt.id} value={lt.id}>{lt.label}</option>
           ))}
         </select>
+        {/* "Available" rather than "balance": leave already booked for a future
+            date is not gone from today's balance but cannot be booked twice. */}
+        {selectedBalance && (
+          <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.inkSoft, marginTop: 6 }}>
+            {selectedBalance.available} day(s) available
+            {Number(selectedBalance.reserved) > 0 && (
+              <span style={{ color: COLORS.gold }}> · {selectedBalance.reserved} awaiting approval</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
@@ -169,6 +185,14 @@ export default function ApplyLeave() {
               {breakdown.chargeable}
             </span>
           </div>
+          {afterBalance !== null && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontFamily: FONTS.body, fontSize: 13, paddingTop: 6, marginTop: 6, borderTop: `1px solid ${COLORS.line}` }}>
+              <span style={{ color: COLORS.inkSoft }}>Balance after this request</span>
+              <span style={{ fontFamily: FONTS.mono, fontWeight: 600, color: afterBalance < 0 ? COLORS.clay : COLORS.ink }}>
+                {afterBalance.toFixed(2)}
+              </span>
+            </div>
+          )}
         </Card>
       )}
 

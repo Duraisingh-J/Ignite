@@ -8,17 +8,20 @@ import Card from "../../components/Card";
 import Button from "../../components/Button";
 import SectionLabel from "../../components/SectionLabel";
 import RequestsTable from "../../components/RequestsTable";
+import LeaveDial from "../../components/LeaveDial";
+
+// Fixed order, assigned by position — never cycled, so a leave type keeps its
+// colour as types are added or removed.
+const DIAL_COLORS = [COLORS.navy, COLORS.teal, COLORS.clay, COLORS.gold];
 
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
-  const { employee, requests, holidays, loading } = useLeave();
+  const { employee, requests, holidays, balances, loading } = useLeave();
 
   if (loading) {
     return <div style={{ fontFamily: FONTS.body, color: COLORS.inkSoft }}>Loading…</div>;
   }
 
-  // All figures are derived from live data. There is no balance concept in the
-  // current schema, so no balance is shown rather than an invented one.
   const summary = {
     pending: requests.filter((r) => r.status === "Pending").length,
     approved: requests.filter((r) => r.status === "Approved").length,
@@ -32,6 +35,10 @@ export default function EmployeeDashboard() {
     .filter((h) => h.date >= new Date().toISOString().slice(0, 10))
     .slice(0, 5);
 
+  // A type with no accrual policy has no balance to show, so it is left out
+  // rather than rendered as a zero that looks like an exhausted allowance.
+  const withPolicy = (balances ?? []).filter((b) => b.policyName);
+
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
@@ -42,6 +49,57 @@ export default function EmployeeDashboard() {
           Here's where things stand.
         </div>
       </div>
+
+      {withPolicy.length > 0 && (
+        <>
+          <SectionLabel eyebrow="Balance">Available leave</SectionLabel>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+              gap: 16,
+              marginBottom: 32,
+            }}
+          >
+            {withPolicy.map((b, i) => (
+              <Card key={b.leaveTypeId} style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <LeaveDial
+                  label={b.leaveTypeName}
+                  balance={b.displayBalance}
+                  maxBalance={b.maxBalance}
+                  reserved={Number(b.reserved) || 0}
+                  color={DIAL_COLORS[i % DIAL_COLORS.length]}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: FONTS.body, fontWeight: 600, fontSize: 15, color: COLORS.ink }}>
+                    {b.leaveTypeName}
+                  </div>
+                  <div style={{ fontFamily: FONTS.mono, fontSize: 12, color: COLORS.inkSoft, marginTop: 3 }}>
+                    {b.available} to book
+                  </div>
+                  {Number(b.reserved) > 0 && (
+                    <div style={{ fontFamily: FONTS.body, fontSize: 11.5, color: COLORS.gold, marginTop: 2 }}>
+                      {b.reserved} awaiting approval
+                    </div>
+                  )}
+                  <div style={{ fontFamily: FONTS.body, fontSize: 11, color: COLORS.inkSoft, marginTop: 4 }}>
+                    {b.accrued} accrued · {b.used} taken
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          <div style={{ fontFamily: FONTS.body, fontSize: 12, color: COLORS.inkSoft, marginTop: -22, marginBottom: 30 }}>
+            The ring fills against the point at which accrual stops.{" "}
+            <button
+              onClick={() => navigate("/employee/balance")}
+              style={{ background: "none", border: "none", padding: 0, color: COLORS.navy, fontFamily: FONTS.body, fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}
+            >
+              See how each balance was reached
+            </button>
+          </div>
+        </>
+      )}
 
       <div style={{ marginBottom: 32 }}>
         <Button onClick={() => navigate("/employee/apply")}>
@@ -71,10 +129,7 @@ export default function EmployeeDashboard() {
             No requests yet.
           </div>
         ) : (
-          <RequestsTable
-            requests={requests.slice(0, 3)}
-            onSelect={() => navigate("/employee/requests")}
-          />
+          <RequestsTable requests={requests.slice(0, 3)} onSelect={() => navigate("/employee/requests")} />
         )}
       </Card>
 
@@ -89,12 +144,9 @@ export default function EmployeeDashboard() {
             <div
               key={h.id}
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "10px 0",
+                display: "flex", justifyContent: "space-between", padding: "10px 0",
                 borderBottom: i < upcoming.length - 1 ? `1px solid ${COLORS.line}` : "none",
-                fontFamily: FONTS.body,
-                fontSize: 14,
+                fontFamily: FONTS.body, fontSize: 14,
               }}
             >
               <span style={{ color: COLORS.inkSoft, fontFamily: FONTS.mono }}>{fmtDate(h.date)}</span>

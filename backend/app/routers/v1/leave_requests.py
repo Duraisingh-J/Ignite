@@ -1,7 +1,8 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Depends
+from app.auth import get_current_user, CurrentUser, status
 
 from app.errors import ApiError
 from app.schemas import (

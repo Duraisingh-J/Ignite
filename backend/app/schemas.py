@@ -87,7 +87,6 @@ class RegionOut(CamelModel):
 
 
 class RegionCreate(CamelIn):
-    tenant_id: UUID
     code: str = Field(min_length=2, max_length=8)
     country_name: str = Field(min_length=1, max_length=80)
     work_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
@@ -125,7 +124,6 @@ class RoleOut(CamelModel):
 
 
 class RoleCreate(CamelIn):
-    tenant_id: UUID
     code: str = Field(min_length=2, max_length=24)
     name: str = Field(min_length=1, max_length=60)
 
@@ -151,6 +149,8 @@ class EmployeeOut(CamelModel):
     name: str
     email: str
     join_date: date
+    password_hash: str | None = None
+    role: str | None = None
 
 
 class EmployeeSummaryOut(CamelModel):
@@ -185,7 +185,6 @@ class TeamMemberOut(CamelModel):
 
 
 class EmployeeCreate(CamelIn):
-    tenant_id: UUID
     region_id: UUID
     manager_id: UUID | None = None
     name: str = Field(min_length=1, max_length=120)
@@ -220,7 +219,6 @@ class HolidayOut(CamelModel):
 
 
 class HolidayCreate(CamelIn):
-    tenant_id: UUID
     region_id: UUID
     date: date
     name: str = Field(min_length=1, max_length=120)
@@ -409,3 +407,24 @@ class PageMeta(CamelModel):
 class PagedResponse(BaseModel, Generic[T]):
     data: list[T]
     meta: PageMeta
+
+
+class LoginRequest(CamelIn):
+    email: EmailStr
+    password: str
+
+class LoginResponse(CamelModel):
+    access_token: str
+    role: str
+
+class SignupRequest(CamelIn):
+    org_name: str
+    admin_name: str
+    email: EmailStr
+    password: str
+    region_name: str
+
+class SignupResponse(CamelModel):
+    tenant_id: UUID
+    employee_id: UUID
+    access_token: str

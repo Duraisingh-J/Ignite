@@ -62,3 +62,7 @@ async def fetch_one(sql: str, params: tuple = ()) -> dict | None:
     async with get_cursor() as cur:
         await cur.execute(sql, params)
         return await cur.fetchone()
+
+async def get_db():
+    async with pool.connection() as conn:
+        yield conn

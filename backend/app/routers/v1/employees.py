@@ -1,7 +1,8 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, status, Depends
+from app.auth import get_current_user, CurrentUser
 
 from app.schemas import (
     DataResponse,
@@ -21,12 +22,12 @@ router = APIRouter(prefix="/employees", tags=["employees"])
 
 @router.get("", response_model=PagedResponse[EmployeeSummaryOut])
 async def list_employees(
-    tenant_id: UUID = Query(..., alias="tenantId"),
+    current_user: CurrentUser = Depends(get_current_user),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
     """All employees in a tenant (admin view), paginated."""
-    rows, total = await employee_service.list_by_tenant(tenant_id, limit, offset)
+    rows, total = await employee_service.list_by_tenant(current_user.tenant_id, limit, offset)
     return {
         "data": [EmployeeSummaryOut.model_validate(r, from_attributes=True) for r in rows],
         "meta": PageMeta(total=total, limit=limit, offset=offset),
@@ -34,9 +35,12 @@ async def list_employees(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=DataResponse[EmployeeOut])
-async def create_employee(payload: EmployeeCreate):
+async def create_employee(
+    payload: EmployeeCreate,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     created = await employee_service.create(
-        tenant_id=payload.tenant_id,
+        tenant_id=current_user.tenant_id,
         region_id=payload.region_id,
         manager_id=payload.manager_id,
         name=payload.name.strip(),
@@ -47,8 +51,13 @@ async def create_employee(payload: EmployeeCreate):
 
 
 @router.patch("/{employee_id}", response_model=DataResponse[EmployeeOut])
-async def update_employee(employee_id: UUID, payload: EmployeeUpdate):
+async def update_employee(
+    employee_id: UUID, 
+    payload: EmployeeUpdate,
+    current_user: CurrentUser = Depends(get_current_user)
+):
     """Reassign an employee's manager, region or name."""
+    # TODO: Auth check (tenant_id matches, role check)
     updated = await employee_service.update(
         employee_id,
         manager_id=payload.manager_id,

@@ -30,17 +30,17 @@ INSERT INTO holiday_calendar (id, tenant_id, region_id, date, name, recurrence) 
 ON CONFLICT (region_id, date) DO NOTHING;
 
 -- Manager (Priya) and Employee (Ravi)
-INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_date) VALUES
+INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_date, password_hash, role) VALUES
   ('33333333-3333-3333-3333-333333333334',
    '11111111-1111-1111-1111-111111111111', NULL,
-   '22222222-2222-2222-2222-222222222222', 'Priya', 'priya@meridian.io', '2022-06-01')
+   '22222222-2222-2222-2222-222222222222', 'Priya', 'priya@meridian.io', '2022-06-01', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'MANAGER')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_date) VALUES
+INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_date, password_hash, role) VALUES
   ('33333333-3333-3333-3333-333333333333',
    '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334',
-   '22222222-2222-2222-2222-222222222222', 'Ravi', 'ravi@meridian.io', '2025-03-10')
+   '22222222-2222-2222-2222-222222222222', 'Ravi', 'ravi@meridian.io', '2025-03-10', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE')
 ON CONFLICT (id) DO NOTHING;
 
 -- Leave types (region-scoped)
@@ -57,37 +57,37 @@ ON CONFLICT (region_id, name) DO NOTHING;
 -- 10 additional employees (India region, reporting to Priya).
 -- Fixed UUIDs so re-running this seed is idempotent.
 -- =============================================================
-INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_date) VALUES
+INSERT INTO employee (id, tenant_id, manager_id, region_id, name, email, join_date, password_hash, role) VALUES
   ('33333333-3333-3333-3333-333333330001', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Ananya Iyer',      'ananya.iyer@meridian.io',      '2023-01-16'),
+   'Ananya Iyer',      'ananya.iyer@meridian.io',      '2023-01-16', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330002', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Karthik Nair',     'karthik.nair@meridian.io',     '2023-04-03'),
+   'Karthik Nair',     'karthik.nair@meridian.io',     '2023-04-03', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330003', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Divya Menon',      'divya.menon@meridian.io',      '2023-07-10'),
+   'Divya Menon',      'divya.menon@meridian.io',      '2023-07-10', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330004', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Mohit Sharma',     'mohit.sharma@meridian.io',     '2022-11-21'),
+   'Mohit Sharma',     'mohit.sharma@meridian.io',     '2022-11-21', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330005', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Sneha Reddy',      'sneha.reddy@meridian.io',      '2024-02-05'),
+   'Sneha Reddy',      'sneha.reddy@meridian.io',      '2024-02-05', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330006', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Arjun Verma',      'arjun.verma@meridian.io',      '2024-06-17'),
+   'Arjun Verma',      'arjun.verma@meridian.io',      '2024-06-17', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330007', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Meera Krishnan',   'meera.krishnan@meridian.io',   '2021-09-13'),
+   'Meera Krishnan',   'meera.krishnan@meridian.io',   '2021-09-13', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330008', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Rahul Desai',      'rahul.desai@meridian.io',      '2025-01-08'),
+   'Rahul Desai',      'rahul.desai@meridian.io',      '2025-01-08', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330009', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Pooja Bhatt',      'pooja.bhatt@meridian.io',      '2025-05-26'),
+   'Pooja Bhatt',      'pooja.bhatt@meridian.io',      '2025-05-26', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE'),
   ('33333333-3333-3333-3333-333333330010', '11111111-1111-1111-1111-111111111111',
    '33333333-3333-3333-3333-333333333334', '22222222-2222-2222-2222-222222222222',
-   'Vikram Rao',       'vikram.rao@meridian.io',       '2022-03-14')
+   'Vikram Rao',       'vikram.rao@meridian.io',       '2022-03-14', '$2b$12$l63HGosXxIvhrent36iMPec.RER7Du4mLJ5fqYtXj.QJMY8QI0k5a', 'EMPLOYEE')
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================

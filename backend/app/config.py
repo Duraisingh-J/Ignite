@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     port: int = 4000
     cors_origins: str = "http://localhost:5173"
 
+    # JWT Authentication
+    jwt_secret: str  # Loaded from .env
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 60 * 24  # 1 day
+
     # DATABASE_URL wins when set; otherwise assembled from the PG* fields.
     database_url: str | None = None
     pghost: str = "localhost"

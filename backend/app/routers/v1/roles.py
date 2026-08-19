@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, status, Depends
+from app.auth import get_current_user, CurrentUser
 
 from app.schemas import DataResponse, RoleCreate, RoleHolderCreate, RoleOut
 from app.services import role_service
@@ -9,20 +10,20 @@ router = APIRouter(prefix="/roles", tags=["roles"])
 
 
 @router.get("", response_model=DataResponse[list[RoleOut]])
-async def list_roles(tenant_id: UUID = Query(..., alias="tenantId")):
+async def list_roles(current_user: CurrentUser = Depends(get_current_user)):
     """Roles and who holds them.
 
     Roles exist because the reporting line cannot reach every approver: walking
     upward from an engineer yields managers forever and never HR.
     """
-    rows = await role_service.list_for_tenant(tenant_id)
+    rows = await role_service.list_for_tenant(current_user.tenant_id)
     return {"data": [RoleOut.model_validate(r, from_attributes=True) for r in rows]}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=DataResponse[RoleOut])
 async def create_role(payload: RoleCreate):
     created = await role_service.create(
-        tenant_id=payload.tenant_id, code=payload.code, name=payload.name
+        tenant_id=current_user.tenant_id, code=payload.code, name=payload.name
     )
     return {"data": RoleOut.model_validate(created, from_attributes=True)}
 

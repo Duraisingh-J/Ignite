@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.auth import get_current_user
 
 from app.routers.v1 import (
     employees,
@@ -10,7 +11,7 @@ from app.routers.v1 import (
     stats,
 )
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter(prefix="/api/v1", dependencies=[Depends(get_current_user)])
 
 
 @router.get("/health", tags=["health"])

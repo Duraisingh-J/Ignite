@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, status, Depends
+from app.auth import get_current_user, CurrentUser
 
 from app.errors import ApiError
 from app.schemas import DataResponse, HolidayCreate, HolidayOut
@@ -29,7 +30,7 @@ async def list_holidays(
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=DataResponse[HolidayOut])
 async def create_holiday(payload: HolidayCreate):
     created = await holiday_service.create(
-        tenant_id=payload.tenant_id,
+        tenant_id=current_user.tenant_id,
         region_id=payload.region_id,
         day=payload.date,
         name=payload.name.strip(),

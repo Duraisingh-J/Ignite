@@ -15,8 +15,12 @@ export const TENANT_ID = import.meta.env.VITE_TENANT_ID;
 export async function request(path, { raw = false, ...options } = {}) {
   let res;
   try {
+    const token = localStorage.getItem("leave-app.token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
     res = await fetch(`${BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
+      headers,
       ...options,
     });
   } catch {

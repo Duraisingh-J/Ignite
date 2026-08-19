@@ -1,42 +1,80 @@
-// Who you are "logged in" as.
-//
-// There is no authentication yet, so identity is a demo affordance rather than
-// a security boundary: the server trusts whatever id it is given. Holding it in
-// context instead of a build-time env var means you can move between people
-// without editing .env and restarting Vite — which matters for multi-tier
-// approval, where tier 1 and tier 2 belong to different people.
-//
-// Replace this with a real session when auth lands; every call site already
-// takes the id as a parameter, so only this provider changes.
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { jwtDecode } from "jwt-decode";
 import { fetchAllEmployees } from "../api/leaveApi";
-import { EMPLOYEE_ID } from "../api/client";
 
-const STORAGE_KEY = "leave-app.currentUserId";
+const STORAGE_KEY = "leave-app.token";
 
 const SessionContext = createContext(null);
 
 export function SessionProvider({ children }) {
-  const [currentUserId, setCurrentUserId] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || EMPLOYEE_ID
-  );
+  const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY));
+  const [user, setUser] = useState(null);
+  
   const [people, setPeople] = useState([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
 
+  // Decode token on mount or when token changes
   useEffect(() => {
-    fetchAllEmployees(undefined, { limit: 200 })
-      .then((res) => setPeople(res.rows))
-      .catch(() => setPeople([]))
-      .finally(() => setLoadingPeople(false));
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        // Ensure token is not expired
+        if (decoded.exp * 1000 < Date.now()) {
+          logout();
+        } else {
+          setUser({
+            employeeId: decoded.sub,
+            tenantId: decoded.tenant_id,
+            role: decoded.role,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to decode token", err);
+        logout();
+      }
+    } else {
+      setUser(null);
+    }
+  }, [token]);
+
+  // Optionally fetch all employees for the UI (e.g. employee directory)
+  useEffect(() => {
+    if (user) {
+      fetchAllEmployees(undefined, { limit: 200 })
+        .then((res) => setPeople(res.rows))
+        .catch(() => setPeople([]))
+        .finally(() => setLoadingPeople(false));
+    } else {
+      setPeople([]);
+      setLoadingPeople(false);
+    }
+  }, [user]);
+
+  const login = useCallback((newToken) => {
+    localStorage.setItem(STORAGE_KEY, newToken);
+    setToken(newToken);
   }, []);
 
-  const switchUser = useCallback((id) => {
-    localStorage.setItem(STORAGE_KEY, id);
-    setCurrentUserId(id);
+  const logout = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setToken(null);
+    setUser(null);
   }, []);
 
+  // Backwards compatibility with the old "switchUser" fake auth for development if needed,
+  // but we remove it now since we have real auth.
+  
   return (
-    <SessionContext.Provider value={{ currentUserId, switchUser, people, loadingPeople }}>
+    <SessionContext.Provider value={{ 
+      token, 
+      user, 
+      isAuthenticated: !!user,
+      currentUserId: user?.employeeId,
+      login, 
+      logout, 
+      people, 
+      loadingPeople 
+    }}>
       {children}
     </SessionContext.Provider>
   );
@@ -44,6 +82,6 @@ export function SessionProvider({ children }) {
 
 export function useSession() {
   const ctx = useContext(SessionContext);
-  if (!ctx) throw new Error("useSession must be used inside <SessionProvider>");
+  if (!ctx) throw new Error("useSession must be used within SessionProvider");
   return ctx;
 }

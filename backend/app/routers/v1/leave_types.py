@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, status, Depends
+from app.auth import get_current_user, CurrentUser
 
 from app.schemas import DataResponse, LeaveTypeCreate, LeaveTypeOut, LeaveTypeUpdate
 from app.services import leave_type_service
@@ -11,19 +12,19 @@ router = APIRouter(prefix="/leave-types", tags=["leave-types"])
 @router.get("", response_model=DataResponse[list[LeaveTypeOut]])
 async def list_leave_types(
     region_id: UUID | None = Query(None, alias="regionId"),
-    tenant_id: UUID | None = Query(None, alias="tenantId"),
+    current_user: CurrentUser = Depends(get_current_user),
     include_inactive: bool = Query(False, alias="includeInactive"),
 ):
     """LeaveType.getDropdownOptions(regionId), or every type in a tenant."""
     from app.errors import ApiError
 
-    if region_id is None and tenant_id is None:
+    if region_id is None and current_user.tenant_id is None:
         raise ApiError.bad_request('Provide either "regionId" or "tenantId"')
 
     if region_id is not None:
         rows = await leave_type_service.list_for_region(region_id, include_inactive)
     else:
-        rows = await leave_type_service.list_for_tenant(tenant_id)
+        rows = await leave_type_service.list_for_tenant(current_user.tenant_id)
     return {"data": [LeaveTypeOut.model_validate(r, from_attributes=True) for r in rows]}
 
 

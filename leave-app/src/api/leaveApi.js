@@ -49,25 +49,46 @@ export function toUiApproval(a) {
     stepId: a.stepId,
     stepOrder: a.stepOrder,
     totalSteps: a.totalSteps,
+    // The capacity they are being asked in. A role holder is not in this
+    // employee's reporting line, so the tier number alone does not explain
+    // why the request reached them.
+    approverRole: a.approverRole,
+    roleName: a.roleName,
   };
 }
 
+// Hierarchy tiers are named by their depth. A ROLE step has no fixed depth —
+// it is named by the role itself, which travels on the step as roleName.
 const ROLE_LABEL = {
   MANAGER: "Manager",
   SKIP_LEVEL: "Skip-level",
   DEPT_HEAD: "Department head",
 };
 
+function roleLabel(s) {
+  if (s.approverRole === "ROLE") {
+    // roleName is null only for a step written before the role id was stored.
+    return s.roleName ?? "Role approver";
+  }
+  return ROLE_LABEL[s.approverRole] ?? s.approverRole;
+}
+
 /** API approval chain -> the { label, state, comment } shape Stepper expects. */
 export function chainToSteps(chain) {
   const steps = [{ label: "Request submitted", state: "APPROVED" }];
   for (const s of chain) {
-    const role = ROLE_LABEL[s.approverRole] ?? s.approverRole;
+    const role = roleLabel(s);
     const who = s.approverName ?? "Unassigned";
     let label = `${who} · ${role}`;
     if (s.status === "APPROVED") label += " approved";
     else if (s.status === "REJECTED") label += " rejected";
-    else if (s.status === "SKIPPED") {
+    else if (s.status === "PENDING") {
+      // Say who it sits with. A bare name and role reads as a dead end, which
+      // is what makes a waiting step look like a missing button.
+      label = s.approverName
+        ? `${who} · ${role} — waiting for their decision`
+        : `${role} — waiting, no approver assigned`;
+    } else if (s.status === "SKIPPED") {
       // A step with nobody to route to, or one bypassed by a rejection above.
       label = s.approverName ? `${who} · ${role} — not required` : `${role} — no approver in the reporting line`;
     }

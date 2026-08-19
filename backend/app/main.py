@@ -18,13 +18,31 @@ from app.errors import (
     unhandled_error_handler,
     validation_error_handler,
 )
+from app.auth import assert_startup_safe
+from app.auth import router as auth_router
 from app.routers.v1.router import router as v1_router
+
+# uvicorn configures only its own loggers, so anything the application logs
+# would otherwise be discarded — including every notification dispatch, which
+# is the only visible evidence that a message was sent or why it was not.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)-8s %(name)s: %(message)s",
+)
+# Third-party clients are chatty at INFO and drown the app's own output.
+logging.getLogger("slack_sdk").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 logger = logging.getLogger("app")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Before anything else: refuse to run while believing we are protected and
+    # not being. A service that starts in that state is worse than one that
+    # does not start at all.
+    assert_startup_safe()
+
     await pool.open()
     # Probe once at boot so a bad password is obvious in the log immediately,
     # rather than only showing up as a failed request later.
@@ -66,6 +84,8 @@ def create_app() -> FastAPI:
     app.add_exception_handler(Exception, unhandled_error_handler)
 
     # Versioned surface. A future v2 mounts alongside this one.
+    # Mounted under the same version prefix as everything else.
+    v1_router.include_router(auth_router)
     app.include_router(v1_router)
 
     return app

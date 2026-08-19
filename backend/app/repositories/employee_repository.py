@@ -98,6 +98,7 @@ async def update(
     clear_manager: bool = False,
     region_id: UUID | None = None,
     name: str | None = None,
+    email: str | None = None,
 ) -> dict | None:
     """Partial update. `clear_manager` distinguishes "set to NULL" from "leave alone",
     which a plain None argument cannot express."""
@@ -113,6 +114,9 @@ async def update(
     if name is not None:
         sets.append("name = %s")
         params.append(name)
+    if email is not None:
+        sets.append("email = %s")
+        params.append(email)
     if not sets:
         return await find_by_id(employee_id)
 

@@ -2,6 +2,9 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LeaveProvider } from "./context/LeaveContext";
 import { SessionProvider } from "./context/SessionContext";
+import { AuthProvider } from "./auth/AuthContext";
+import RequireAuth from "./auth/RequireAuth";
+import Login from "./pages/Login";
 
 import EmployeeLayout from "./layouts/EmployeeLayout";
 import ManagerLayout from "./layouts/ManagerLayout";
@@ -31,43 +34,69 @@ import AccrualPolicies from "./pages/admin/AccrualPolicies";
 
 export default function App() {
   return (
-    // Session wraps Leave: switching person re-keys every fetch below it.
-    <SessionProvider>
-      <LeaveProvider>
-        <BrowserRouter>
+    // AuthProvider is outermost and the only thing that mounts unauthenticated,
+    // because it is what decides whether anything else may.
+    <AuthProvider>
+      <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/employee" replace />} />
+          {/* The only public route. */}
+          <Route path="/login" element={<Login />} />
 
-          <Route path="/employee" element={<EmployeeLayout />}>
-            <Route index element={<EmployeeDashboard />} />
-            <Route path="apply" element={<ApplyLeave />} />
-            <Route path="requests" element={<MyRequests />} />
-            <Route path="balance" element={<Balance />} />
-            <Route path="eligible" element={<EligibleLeaveTypes />} />
-            <Route path="holidays" element={<EmployeeHolidays />} />
-            <Route path="profile" element={<Profile />} />
-          </Route>
+          {/* Everything else. The data providers sit INSIDE the guard rather
+              than above it: both fetch on mount, and mounting them before a
+              session exists would fire a wave of 401s behind the login form
+              and clear the very token the user was about to receive. */}
+          <Route
+            path="/*"
+            element={
+              <RequireAuth>
+                {/* Session wraps Leave: switching person re-keys every fetch below it. */}
+                <SessionProvider>
+                  <LeaveProvider>
+                    <AppRoutes />
+                  </LeaveProvider>
+                </SessionProvider>
+              </RequireAuth>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
 
-          <Route path="/manager" element={<ManagerLayout />}>
-            <Route index element={<ManagerDashboard />} />
-            <Route path="approvals" element={<Approvals />} />
-            <Route path="team" element={<Team />} />
-            <Route path="calendar" element={<Calendar />} />
-          </Route>
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/employee" replace />} />
 
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="employees" element={<Employees />} />
-            <Route path="types" element={<AdminLeaveTypes />} />
-            <Route path="policies" element={<Policies />} />
-            <Route path="regions" element={<Regions />} />
-            <Route path="roles" element={<Roles />} />
-            <Route path="accrual" element={<AccrualPolicies />} />
-            <Route path="holidays" element={<AdminHolidays />} />
-          </Route>
-          </Routes>
-        </BrowserRouter>
-      </LeaveProvider>
-    </SessionProvider>
+      <Route path="/employee" element={<EmployeeLayout />}>
+        <Route index element={<EmployeeDashboard />} />
+        <Route path="apply" element={<ApplyLeave />} />
+        <Route path="requests" element={<MyRequests />} />
+        <Route path="balance" element={<Balance />} />
+        <Route path="eligible" element={<EligibleLeaveTypes />} />
+        <Route path="holidays" element={<EmployeeHolidays />} />
+        <Route path="profile" element={<Profile />} />
+      </Route>
+
+      <Route path="/manager" element={<ManagerLayout />}>
+        <Route index element={<ManagerDashboard />} />
+        <Route path="approvals" element={<Approvals />} />
+        <Route path="team" element={<Team />} />
+        <Route path="calendar" element={<Calendar />} />
+      </Route>
+
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<AdminDashboard />} />
+        <Route path="employees" element={<Employees />} />
+        <Route path="types" element={<AdminLeaveTypes />} />
+        <Route path="policies" element={<Policies />} />
+        <Route path="regions" element={<Regions />} />
+        <Route path="roles" element={<Roles />} />
+        <Route path="accrual" element={<AccrualPolicies />} />
+        <Route path="holidays" element={<AdminHolidays />} />
+      </Route>
+    </Routes>
   );
 }

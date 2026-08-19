@@ -26,6 +26,13 @@ export default function ApprovalCard({ a, onOpen, onApprove, onReject, compact, 
               approval {a.stepOrder} of {a.totalSteps}
             </div>
           )}
+          {/* A role step arrives from outside the reporting line, so name the
+              capacity rather than leaving it to be inferred from the tier. */}
+          {a.approverRole === "ROLE" && a.roleName && (
+            <div style={{ fontFamily: FONTS.body, fontSize: 11, color: COLORS.gold, fontWeight: 600, marginTop: 3 }}>
+              as {a.roleName}
+            </div>
+          )}
         </div>
       </div>
 

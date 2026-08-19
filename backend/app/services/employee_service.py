@@ -95,6 +95,7 @@ async def update(
     clear_manager: bool = False,
     region_id: UUID | None = None,
     name: str | None = None,
+    email: str | None = None,
 ) -> dict:
     employee = await employee_repository.find_by_id(employee_id)
     if employee is None:
@@ -110,12 +111,21 @@ async def update(
         if region["tenant_id"] != employee["tenant_id"]:
             raise ApiError.bad_request("regionId does not belong to that tenant")
 
+    if email is not None:
+        email = email.strip().lower()
+        # The column is UNIQUE, so a clash would surface as an integrity error
+        # from the driver rather than something the client can act on.
+        clash = await employee_repository.find_by_email(email)
+        if clash and clash["id"] != employee_id:
+            raise ApiError.conflict(f"{email} already belongs to {clash['name']}")
+
     updated = await employee_repository.update(
         employee_id,
         manager_id=manager_id,
         clear_manager=clear_manager,
         region_id=region_id,
         name=name,
+        email=email,
     )
     assert updated is not None
     return updated

@@ -32,6 +32,21 @@ class ApiError(Exception):
     def conflict(cls, message: str, details: dict | None = None) -> "ApiError":
         return cls(409, "CONFLICT", message, details)
 
+    @classmethod
+    def unauthorized(cls, message: str = "Authentication required") -> "ApiError":
+        """401 — we do not know who you are, or your session has lapsed.
+
+        The client's correct response is to sign in again, which is why this is
+        distinct from forbidden(): retrying with the same credentials is futile
+        there and appropriate here.
+        """
+        return cls(401, "UNAUTHORIZED", message)
+
+    @classmethod
+    def forbidden(cls, message: str = "Not permitted") -> "ApiError":
+        """403 — we know who you are, and you may not do this."""
+        return cls(403, "FORBIDDEN", message)
+
 
 def _envelope(code: str, message: str, details: dict | None = None) -> dict:
     body: dict = {"code": code, "message": message}

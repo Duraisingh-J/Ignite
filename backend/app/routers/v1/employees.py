@@ -48,13 +48,14 @@ async def create_employee(payload: EmployeeCreate):
 
 @router.patch("/{employee_id}", response_model=DataResponse[EmployeeOut])
 async def update_employee(employee_id: UUID, payload: EmployeeUpdate):
-    """Reassign an employee's manager, region or name."""
+    """Reassign an employee's manager, region, name or email address."""
     updated = await employee_service.update(
         employee_id,
         manager_id=payload.manager_id,
         clear_manager=payload.clear_manager,
         region_id=payload.region_id,
         name=payload.name.strip() if payload.name else None,
+        email=str(payload.email) if payload.email else None,
     )
     return {"data": EmployeeOut.model_validate(updated, from_attributes=True)}
 

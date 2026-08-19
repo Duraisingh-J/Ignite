@@ -6,7 +6,7 @@
 Built in **vertical slices**, running end-to-end against PostgreSQL. Every
 screen reads and writes real data — there is no mock data in the application.
 
-📘 **[Full build documentation →](docs/BUILD.md)**  ·  🔀 **[Multi-tier approval →](docs/multi-tier-approval.md)**  ·  📐 **[Accrual spec (planned) →](docs/ACCRUAL-SPEC.md)**
+📘 **[Full build documentation →](docs/BUILD.md)**  ·  🔀 **[Multi-tier approval →](docs/multi-tier-approval.md)**  ·  📐 **[Accrual spec (planned) →](docs/ACCRUAL-SPEC.md)**  ·  🔔 **[Notifications →](docs/NOTIFICATIONS.md)**
 
 ---
 
@@ -52,21 +52,23 @@ backend/                 FastAPI service
     db.py                async connection pool
     schemas.py           Pydantic models (camelCase aliases for the client)
     errors.py            ApiError + JSON error envelope
-    db/schema.sql        the six tables of the v1 model
+    db/schema.sql        base tables; db/migrations/ carries 010 onward
     db/seed.sql          demo tenant / region / employees / leave types / holidays
+    auth/                tenant-admin JWT: passwords, tokens, guard (pluggable)
+    notifications/       Slack + email on leave events (pluggable)
     repositories/        SQL only
     services/            business rules, incl. working_days calculator
     routers/v1/          versioned routers
-  scripts/               migrate.py, seed.py
+  scripts/               migrate_up.py, seed.py, create_admin.py, repair_chains.py
 
 leave-app/               PRIMARY UI — routed app (employee / manager / admin)
   src/api/               API client + adapters (API shape -> UI shape)
   src/context/           LeaveContext: loads employee, types, holidays, requests
   src/pages/employee/    ApplyLeave, MyRequests, Holidays, Profile (live)
-  src/pages/manager/     mock only
-  src/pages/admin/       mock only
+  src/pages/manager/     Approvals, Team, Calendar (live)
+  src/pages/admin/       Employees, Leave types, Regions, Roles, Accrual, Holidays (live)
+  src/auth/              admin login: token storage, route guard, context
 
-frontend/                Earlier Tailwind scaffold. Superseded by leave-app/.
 leave-management-app.jsx Original single-file prototype (design reference).
 simple_leave_submission_model (6).mermaid   The v1 domain model this slice implements.
 ```

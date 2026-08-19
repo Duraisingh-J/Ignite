@@ -209,6 +209,9 @@ class EmployeeUpdate(CamelIn):
     clear_manager: bool = False
     region_id: UUID | None = None
     name: str | None = Field(default=None, min_length=1, max_length=120)
+    # Editable because notifications are delivered to it: a seeded placeholder
+    # address has to be repointable at a real inbox without a re-seed.
+    email: EmailStr | None = None
 
 
 # ============================ Holiday ============================
@@ -274,6 +277,9 @@ class ApprovalStepOut(CamelModel):
     approver_id: UUID | None
     approver_name: str | None
     approver_role: str
+    # The role this step was resolved for, frozen at submit. Only ROLE steps
+    # have one — hierarchy tiers are named by their depth instead.
+    role_name: str | None = None
     status: str
     comment: str | None
     decided_at: datetime | None
@@ -367,6 +373,10 @@ class ApprovalOut(CamelModel):
     step_id: UUID | None = None
     step_order: int | None = None
     total_steps: int | None = None
+    # The capacity this step asks them to act in — a hierarchy tier, or a named
+    # role for a step resolved outside the reporting line.
+    approver_role: str | None = None
+    role_name: str | None = None
 
 
 # ============================ Accrual policies ============================

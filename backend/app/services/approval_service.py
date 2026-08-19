@@ -112,6 +112,10 @@ async def build_chain(
                 step_order=len(approvers) + 1,
                 approver_id=approver,
                 approver_role="ROLE",
+                # Frozen with the step: an admin repointing this leave type
+                # from HR to Finance next month must not rewrite the label on
+                # a request HR already signed.
+                approver_role_id=role_id,
                 status=status,
             )
         )
@@ -184,6 +188,19 @@ async def decide_step(
 
         await reservation_service.release(request_id=request_id, reason="rejected")
 
+    # Approver -> employee, and onward to the next tier when one is waiting.
+    # `derived` is passed rather than re-read so the message and the stored
+    # status are guaranteed to be the same value.
+    from app import notifications
+
+    await notifications.step_decided(
+        request_id=request_id,
+        approver_id=approver_id,
+        approved=approve,
+        comment=comment,
+        request_status=derived,
+    )
+
     return {
         "requestId": request_id,
         "stepId": step_id,
@@ -201,6 +218,8 @@ async def get_chain(leave_request_id: UUID) -> list[dict]:
             "approverId": r["approver_id"],
             "approverName": r.get("approver_name"),
             "approverRole": r["approver_role"],
+            # Only a ROLE step has one; the hierarchy tiers are named by depth.
+            "roleName": r.get("role_name"),
             "status": r["status"],
             "comment": r["comment"],
             "decidedAt": r["decided_at"],

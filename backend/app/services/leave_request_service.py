@@ -182,6 +182,13 @@ async def submit(
         if updated is not None:
             created = updated
 
+    # Tell whoever the chain landed on. Fired after the status is settled so
+    # the message can never describe a state the database does not hold, and
+    # not awaited so a slow mail server cannot delay the response.
+    from app import notifications
+
+    await notifications.leave_submitted(created["id"])
+
     return _to_dto(created, breakdown)
 
 
@@ -253,6 +260,11 @@ async def get_pending_for_approver(approver_id: UUID) -> list[dict]:
         dto["stepId"] = step["id"]
         dto["stepOrder"] = step["step_order"]
         dto["totalSteps"] = len(chain)
+        # In what capacity they are being asked. A role holder sits outside the
+        # reporting line, so "step 4 of 4" alone does not tell them why it
+        # reached them.
+        dto["approverRole"] = step["approver_role"]
+        dto["roleName"] = step.get("role_name")
         out.append(dto)
     return out
 
@@ -313,11 +325,23 @@ async def decide(request_id: UUID, new_status: str) -> dict:
     else:
         # CANCELLED is the employee withdrawing; it bypasses the chain, and any
         # steps still pending become moot.
+        #
+        # Capture who was waiting BEFORE skipping them: afterwards no step is
+        # PENDING any more and there is no record of who to stand down.
+        waiting = [
+            s["approver_id"]
+            for s in await approval_repository.find_by_request(request_id)
+            if s["status"] == "PENDING" and s["approver_id"]
+        ]
         updated = await leave_request_repository.update_status(request_id, new_status)
         await approval_repository.skip_remaining(request_id, 0)
         from app.services import reservation_service
 
         await reservation_service.release(request_id=request_id, reason="cancelled")
+
+        from app import notifications
+
+        await notifications.leave_cancelled(request_id, waiting)
     assert updated is not None
 
     employee = await employee_repository.find_by_id(updated["employee_id"])

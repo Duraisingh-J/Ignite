@@ -1,0 +1,320 @@
+classDiagram
+    %% ==================== MERIDIAN — FINAL IMPLEMENTATION MODEL ====================
+    %% Kept in step with backend/app/db/schema.sql + app/db/migrations/002..010.
+    %% Update both together.
+    %%
+    %% Supersedes simple_leave_submission_model (6).mermaid, which covered only the
+    %% first vertical slice. Everything below is built and running.
+    %%
+    %% 12 tables. Four things are DERIVED and never stored:
+    %%   LeaveRequest.status      folded from its approval steps
+    %%   balance                  folded from LeaveLedger
+    %%   chargeableDays           computed from the region's week + holidays
+    %%   approval depth           computed from leaveType + request length
+    %%
+    %% Still out of scope: half-days, parallel approvals, year-end carryover run,
+    %% employee-level authentication, SLA escalation.
+
+    %% ---------------------------------------------------------------- tenancy
+    class Tenant {
+        +UUID id
+        +String orgName
+    }
+
+    class TenantAdmin {
+        +UUID id
+        +UUID tenantId
+        +String email
+        +String passwordHash
+        +String name
+        +Boolean isActive
+        +DateTime createdAt
+        +DateTime lastLoginAt
+        +verifyPassword(plain) Boolean
+        %% pbkdf2_sha256$iterations$salt$hash — self-describing so the
+        %% cost can be raised without invalidating existing hashes.
+        %% UNIQUE(tenantId, email) — scoped, not global.
+    }
+
+    %% ---------------------------------------------------------------- geography
+    class Region {
+        +UUID id
+        +UUID tenantId
+        +String code
+        +String countryName
+        +Int[] workDays
+        +String timezone
+        +isWorkingDay(date) Boolean
+        %% workDays holds Python weekday numbers, Monday = 0.
+        %% India [0,1,2,3,4]  ·  UAE [6,0,1,2,3] (Sun-Thu)
+        %% timezone is STORED AND DISPLAYED ONLY — no calculation reads it.
+    }
+
+    class HolidayCalendar {
+        +UUID id
+        +UUID tenantId
+        +UUID regionId
+        +Date date
+        +String name
+        +Recurrence recurrence
+        +expand(from, to) Date[]
+        %% ANNUAL repeats month/day; the stored year is only an anchor.
+        %% Expanded against the REQUESTED range, never the current year,
+        %% or a 2031 request never sees a rule anchored in 2026.
+    }
+
+    %% ---------------------------------------------------------------- people
+    class Employee {
+        +UUID id
+        +UUID tenantId
+        +UUID managerId
+        +UUID regionId
+        +String name
+        +String email
+        +Date joinDate
+        +managementChain() UUID[]
+        +tenureMonths(asOf) Int
+        %% managerId is self-referencing and nullable — the top of the
+        %% tree has none. managementChain() is a recursive CTE ordered by
+        %% depth; without that ORDER BY, tier 1 can become the skip-level.
+        %% email drives notification delivery and Slack DM lookup.
+    }
+
+    class Role {
+        +UUID id
+        +UUID tenantId
+        +String code
+        +String name
+        %% Data, not an enum: an org can add LEGAL without a migration.
+    }
+
+    class EmployeeRole {
+        +UUID id
+        +UUID employeeId
+        +UUID roleId
+        +UUID regionId
+        %% regionId NULL = tenant-wide. Uniqueness needs TWO PARTIAL
+        %% INDEXES, because UNIQUE(a,b,c) does not constrain NULLs —
+        %% in SQL, NULL != NULL, so duplicate holders slipped through.
+    }
+
+    %% ---------------------------------------------------------------- policy
+    class LeaveType {
+        +UUID id
+        +UUID regionId
+        +String name
+        +Boolean isPaid
+        +Boolean isActive
+        +Boolean requiresApproval
+        +Short approvalLevels
+        +Short escalateAboveDays
+        +UUID finalApproverRoleId
+        +requiredLevels(chargeableDays) Int
+        %% Depth lives here rather than a separate policy table: leave
+        %% types are ALREADY region-scoped, so approval depth becomes
+        %% region-specific for free.
+        %% levels = approvalLevels + (chargeable > escalateAboveDays ? 1 : 0)
+        %% capped at MAX_LEVELS = 3; a role step may be appended after.
+    }
+
+    class AccrualPolicy {
+        +UUID id
+        +UUID tenantId
+        +String name
+        +UUID regionId
+        +UUID leaveTypeId
+        +Short tenureFromMonths
+        +Short tenureToMonths
+        +AccrualMethod method
+        +Decimal rate
+        +Short daysWorkedDivisor
+        +Short payPeriodsPerYear
+        +Short waitingPeriodDays
+        +Boolean prorateOnJoin
+        +Decimal maxBalance
+        +Decimal negativeAllowedDays
+        +Decimal roundingStep
+        +ResetBasis resetBasis
+        +Decimal carryoverMax
+        +Short carryoverExpiryMonths
+        +Boolean isEncashable
+        +Int priority
+        +Boolean isActive
+        +periodAmount(periodEnd, joinDate) Decimal
+        %% Tenure band is [from, to) — the UPPER BOUND IS EXCLUSIVE.
+        %% "0-24" and "25+" leave month 24 matching nothing, and the
+        %% employee silently accrues zero. A coverage check reports it.
+        %% NULL regionId or leaveTypeId acts as a wildcard, so a
+        %% tenant-wide default can sit beneath regional overrides.
+    }
+
+    %% ---------------------------------------------------------------- requests
+    class LeaveRequest {
+        +UUID id
+        +UUID tenantId
+        +UUID employeeId
+        +UUID leaveTypeId
+        +Date startDate
+        +Date endDate
+        +LeaveStatus status
+        +String reason
+        +DateTime submittedAt
+        +submit() LeaveRequest
+        +cancel() LeaveRequest
+        +breakdown() DayBreakdown
+        %% status is a CACHE of the chain, never written directly.
+        %% Writing it lets the request read APPROVED while a step still
+        %% reads PENDING, and the two stay contradictory forever.
+        %% chargeableDays is recomputed on read, NOT stored — the source
+        %% of three past bugs and a known weakness.
+    }
+
+    class DayBreakdown {
+        <<value object>>
+        +Int calendarDays
+        +Int weekendDays
+        +Int holidayDays
+        +Int chargeableDays
+        +Date[] excludedDates
+        %% Weekend is tested FIRST and holiday with elif, so a holiday
+        %% falling on a non-working day is excluded exactly ONCE.
+        %% Counting both would subtract the day twice.
+    }
+
+    class LeaveRequestApproval {
+        +UUID id
+        +UUID leaveRequestId
+        +Short stepOrder
+        +UUID approverId
+        +ApproverRole approverRole
+        +UUID approverRoleId
+        +ApprovalStatus status
+        +String comment
+        +DateTime decidedAt
+        +decide(approverId, approve, comment) Result
+        %% FROZEN AT SUBMIT. Resolving live would let an org-chart change
+        %% mid-review silently reassign the request and erase an approval
+        %% already given.
+        %% approverRoleId is frozen too, so repointing a leave type from
+        %% HR to Finance cannot rewrite the label on a signed request.
+        %% An unreachable tier is SKIPPED, never left blocking.
+    }
+
+    %% ---------------------------------------------------------------- balances
+    class LeaveLedger {
+        +UUID id
+        +UUID tenantId
+        +UUID employeeId
+        +UUID leaveTypeId
+        +EntryType entryType
+        +Decimal amount
+        +Date effectiveDate
+        +UUID sourceId
+        +String idempotencyKey
+        +String note
+        +DateTime createdAt
+        +balanceAsOf(date) Decimal
+        +availableTotal() Decimal
+        %% APPEND-ONLY. A balance is a fold over these rows, never stored,
+        %% which is what makes "why is it 12?" answerable.
+        %% Release is a compensating REVERSAL, never a delete — an audit
+        %% asks what was requested and refused.
+        %% idempotencyKey 'accrual:<emp>:<policy>:<period>' with ON
+        %% CONFLICT DO NOTHING: a cron firing twice cannot double leave.
+        %% Days are held from SUBMIT, not approval — otherwise three
+        %% overlapping requests each pass the balance check alone.
+    }
+
+    %% ---------------------------------------------------------------- enums
+    class LeaveStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+        CANCELLED
+    }
+
+    class ApprovalStatus {
+        <<enumeration>>
+        PENDING
+        APPROVED
+        REJECTED
+        SKIPPED
+    }
+
+    class ApproverRole {
+        <<enumeration>>
+        MANAGER
+        SKIP_LEVEL
+        DEPT_HEAD
+        ROLE
+    }
+
+    class EntryType {
+        <<enumeration>>
+        ACCRUAL
+        DEDUCTION
+        REVERSAL
+        CARRYOVER
+        EXPIRY
+        ADJUSTMENT
+    }
+
+    class AccrualMethod {
+        <<enumeration>>
+        MONTHLY
+        ANNUAL_GRANT
+        PER_PAY_PERIOD
+        PER_DAYS_WORKED
+    }
+
+    class ResetBasis {
+        <<enumeration>>
+        CALENDAR
+        ANNIVERSARY
+    }
+
+    class Recurrence {
+        <<enumeration>>
+        NONE
+        ANNUAL
+    }
+
+    %% ---------------------------------------------------------------- relations
+    Tenant "1" --> "0..*" Region : operates in
+    Tenant "1" --> "0..*" Employee : employs
+    Tenant "1" --> "0..*" TenantAdmin : administered by
+    Tenant "1" --> "0..*" Role : defines
+    Tenant "1" --> "0..*" AccrualPolicy : sets
+
+    Region "1" --> "0..*" Employee : based in
+    Region "1" --> "0..*" LeaveType : offers
+    Region "1" --> "0..*" HolidayCalendar : observes
+    Region "0..1" --> "0..*" AccrualPolicy : scopes
+    Region "0..1" --> "0..*" EmployeeRole : scopes
+
+    Employee "0..1" --> "0..*" Employee : manages
+    Employee "1" --> "0..*" LeaveRequest : raises
+    Employee "1" --> "0..*" LeaveLedger : earns and spends
+    Employee "1" --> "0..*" EmployeeRole : holds
+    Employee "0..1" --> "0..*" LeaveRequestApproval : approves
+
+    Role "1" --> "0..*" EmployeeRole : assigned by
+    Role "0..1" --> "0..*" LeaveType : final approver for
+    Role "0..1" --> "0..*" LeaveRequestApproval : capacity of
+
+    LeaveType "1" --> "0..*" LeaveRequest : classifies
+    LeaveType "0..1" --> "0..*" AccrualPolicy : governed by
+    LeaveType "1" --> "0..*" LeaveLedger : accounted per
+
+    LeaveRequest "1" *-- "1..4" LeaveRequestApproval : frozen chain
+    LeaveRequest "1" ..> "1" DayBreakdown : derives
+    LeaveRequest "1" --> "0..2" LeaveLedger : reserves and releases
+
+    LeaveRequest ..> LeaveStatus
+    LeaveRequestApproval ..> ApprovalStatus
+    LeaveRequestApproval ..> ApproverRole
+    LeaveLedger ..> EntryType
+    AccrualPolicy ..> AccrualMethod
+    AccrualPolicy ..> ResetBasis
+    HolidayCalendar ..> Recurrence

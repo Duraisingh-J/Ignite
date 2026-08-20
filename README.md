@@ -6,7 +6,7 @@
 Built in **vertical slices**, running end-to-end against PostgreSQL. Every
 screen reads and writes real data — there is no mock data in the application.
 
-📘 **[Full build documentation →](docs/BUILD.md)**  ·  🔀 **[Multi-tier approval →](docs/multi-tier-approval.md)**  ·  📐 **[Accrual spec (planned) →](docs/ACCRUAL-SPEC.md)**  ·  🔔 **[Notifications →](docs/NOTIFICATIONS.md)**
+📘 **[Full build documentation →](docs/BUILD.md)**  ·  🔀 **[Multi-tier approval →](docs/multi-tier-approval.md)**  ·  📐 **[Accrual spec →](docs/ACCRUAL-SPEC.md)**  ·  🔔 **[Notifications →](docs/NOTIFICATIONS.md)**  ·  🗺️ **[Feature map →](docs/FEATURE-MAP.md)**  ·  🧩 **[Class model →](docs/meridian_class_model.mermaid)**
 
 ---
 
@@ -21,12 +21,20 @@ screen reads and writes real data — there is no mock data in the application.
 | Multi-region (India, US, UK, UAE) | ✅ Live |
 | Manager assignment & reassignment | ✅ Live |
 | **Multi-tier approval workflow** | ✅ Live |
+| Role-based approvers (HR outside the reporting line) | ✅ Live |
 | Manager & Admin consoles | ✅ Live |
-| Balances / accrual engine | ⛔ Not built — no balance concept in the schema |
-| Authentication | ⛔ Not built — the API trusts the id it is given |
+| **Dynamic accrual engine** (4 methods, tenure bands, ledger) | ✅ Live |
+| Balances, reservation & the ledger behind them | ✅ Live |
+| Admin-editable accrual policies with gap detection | ✅ Live |
+| **Notifications** — Slack + email on every leave event | ✅ Live |
+| **Authentication** — tenant admin, JWT, no bypass | ✅ Live |
+| Year-end carryover / expiry run | ⛔ Paused — caps act as lifetime ceilings |
+| Employee-level authentication | ⛔ Not built — one credential gates the app |
+| Leave date bounds (earliest / latest / notice) | ⛔ Not built — a 2005 request is accepted |
 
-**22 API endpoints · 7 tables.** Live path: browser → Vite proxy → FastAPI →
-PostgreSQL → back into the UI.
+**40 API endpoints · 12 tables · 10 migrations.** Live path: browser → Vite
+proxy → FastAPI → PostgreSQL → back into the UI. Every route requires a signed
+token except `POST /auth/login` and `GET /health`.
 
 ---
 
